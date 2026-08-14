@@ -820,11 +820,86 @@ def append_target_summary(results) -> str:
     return "\n".join(section)
 
 
+def rebuild_workbook_from_json() -> int:
+    """从调研 JSON 重新生成干净的工作簿：去 OCR 噪音、去重、按内容重新分类。"""
+    jf = BASE_DIR / "小红书-景点餐厅调研.json"
+    if not jf.exists():
+        log(f"缺少 {jf.name}，先运行 --targets 采集")
+        return 1
+    data = json.loads(jf.read_text(encoding="utf-8"))
+    lines = [
+        "# 小红书·景点/餐厅真实游客调研（2026-08，整理版）",
+        "",
+        f"- 数据来源：{jf.name}（Firefox 登录态 + 真实滚动/点击 + 屏幕 OCR）",
+        f"- 整理时间：{time.strftime('%Y-%m-%d %H:%M')}",
+        "- 整理规则：去除浏览器界面噪音；同一笔记按 ID 去重（保留信息更全的一篇）；",
+        "  按内容重新分类：✅内容已采集 / 📱需 App 扫码查看 / ⚠️未采到内容",
+        "",
+    ]
+    total_notes = 0
+    for item in data:
+        t = item["target"]
+        notes = item["notes"]
+        # 去重：同 id 保留评分更高者
+        unique: dict[str, dict] = {}
+        for n in notes:
+            nid = n.get("id") or ("x" + str(len(unique)))
+            if nid in unique:
+                if (n.get("score") or 0) > (unique[nid].get("score") or 0):
+                    unique[nid] = n
+            else:
+                unique[nid] = n
+        uniq_notes = list(unique.values())
+        lines.append(f"## {t['name']}（{t['type']}）")
+        lines.append("")
+        lines.append(
+            f"- 检索词：`{t['keyword']}` ｜ 大众点评：`{t['dpKeyword']}`"
+            f" ｜ 有效笔记 {len(uniq_notes)} 篇"
+        )
+        lines.append(
+            f"- 大众点评搜索：[点此](https://www.dianping.com/search/keyword/19/0_{quote(t['dpKeyword'])})"
+        )
+        lines.append("")
+        for n in uniq_notes:
+            total_notes += 1
+            ml = meaningful_lines(n.get("visibleLines") or [])
+            joined = " ".join(ml)
+            if "扫码" in joined or "打开App" in joined:
+                status = "📱 需 App 扫码查看"
+            elif ml:
+                status = "✅ 内容已采集"
+            else:
+                status = "⚠️ 未采到内容"
+            video = "（视频笔记，仅取文本）" if n.get("isVideo") else ""
+            lines.append(f"### {status} {n.get('title','（无标题）')}{video}")
+            lines.append("")
+            meta = []
+            if n.get("cardDate"):
+                meta.append(f"时间 {n.get('cardDate')}")
+            if n.get("cardLikes"):
+                meta.append(f"赞 {n.get('cardLikes')}")
+            if n.get("author"):
+                meta.append(f"作者 {n.get('author')}（卡片识别，可能有误差）")
+            if meta:
+                lines.append("- " + " ｜ ".join(meta))
+            lines.append(f"- 链接：[打开笔记]({n['href']})")
+            if ml:
+                lines.append("- 内容摘录（正文/评论）：")
+                for v in ml[:14]:
+                    lines.append(f"  - {v[:100]}")
+            lines.append("")
+    OUT_TARGET_WORKBOOK.write_text("\n".join(lines), encoding="utf-8")
+    log(f"整理完成：{len(data)} 个目标 / {total_notes} 篇笔记 → {OUT_TARGET_WORKBOOK.name}")
+    return 0
+
+
 def main():
     dry = "--dry-run" in sys.argv
     if dry:
         log("dry-run：仅检查环境，不检索")
         return 0
+    if "--rebuild" in sys.argv:
+        return rebuild_workbook_from_json()
     if "--targets" in sys.argv:
         skip = set()
         if "--resume" in sys.argv:
