@@ -29,16 +29,19 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: 每分钟同步并推送（持续约 55 分钟）
+      - name: 每分钟同步并推送（单轮约 50 分钟，整点由定时重启）
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          for i in $(seq 1 55); do
+          for i in $(seq 1 50); do
+            git rebase --abort 2>/dev/null || true
+            git merge --abort 2>/dev/null || true
             python3 sync_weather.py || true
             git add "大连天气-2小时预报.md" "大连天气-同步日志.md"
             if ! git diff --cached --quiet; then
               git commit -m "chore: 天气心跳 $(date -u +'%Y-%m-%d %H:%M UTC')" || true
-              git push -q || { git pull --rebase -X theirs -q || true; git push -q || true; }
+              git pull --rebase -X theirs -q 2>/dev/null || true
+              git push -q || { sleep 3; git pull --rebase -X theirs -q 2>/dev/null || true; git push -q || true; }
             fi
             sleep 60
           done
