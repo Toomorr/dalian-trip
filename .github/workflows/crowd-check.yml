@@ -1,0 +1,47 @@
+name: 拥堵检索（小红书·尽力而为）
+
+on:
+  schedule:
+    # 北京时间 07:00 = UTC 23:00；北京时间 17:00 = UTC 09:00
+    - cron: '0 23 * * *'
+    - cron: '0 9 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: crowd-check
+  cancel-in-progress: false
+
+env:
+  TZ: Asia/Shanghai
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 运行拥堵检索（失败也保留工作簿）
+        run: |
+          python3 crowd_search.py || true
+
+      - name: 提交检索结果
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "大连-拥堵排队检索.md"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: 拥堵排队自动检索 $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          else
+            echo "工作簿无变化，跳过提交"
+          fi
