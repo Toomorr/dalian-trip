@@ -484,7 +484,7 @@ function showDay(idx) {
     if(!l.lat) return;
     const m = L.marker([l.lat,l.lng], { icon: icon(day.color, emojis[l.type]||'📌') }).addTo(map);
     const gmapQ = l.gmap||encodeURIComponent(l.name+' Tokyo');
-    m.bindPopup(`<b>${l.name}</b>${l.time!=='—'?'<br><span style="color:#86868b">'+l.time+'</span>':''}<br>${l.desc}${l.budget?'<br><span style="color:#ff9500">'+l.budget+'</span>':''}<br><a href="#" onclick="event.preventDefault();openAS('${l.name.replace(/'/g,"\\'")}',${l.lat},${l.lng},'${gmapQ}')">📍 导航</a>${(l.xhs||l.xhsKeyword)?' · <a href="'+xhsWebUrl(l)+'" target="_blank">📕 小红书</a>':''}`);
+    m.bindPopup(`<b>${l.name}</b>${l.time!=='—'?'<br><span style="color:#86868b">'+l.time+'</span>':''}<br>${l.desc}${l.budget?'<br><span style="color:#ff9500">'+l.budget+'</span>':''}<br><a href="#" onclick="event.preventDefault();openAS('${l.name.replace(/'/g,"\\'")}',${l.lat},${l.lng},'${gmapQ}')">📍 导航</a>${(l.xhs||l.xhsKeyword)?' · <a href="'+xhsWebUrl(l)+'" data-xhs-keyword="'+xhsKeyword(l)+'" target="_blank">📕 小红书</a>':''}`);
     markers.push(m);
     if(l.time!=='—') coords.push([l.lat,l.lng]);
   });
@@ -508,6 +508,11 @@ const IN_APP_WEBVIEW = (() => {
   const ua = (navigator.userAgent || '').toLowerCase();
   return /micromessenger|xhs|xhsdiscover|discover\/|tiktok|aweme|weibo|qq\/|qqbrowser|alipayclient|dingtalk|lark|feishu|ucbrowser|baiduboxapp|toutiao|newsarticle/.test(ua);
 })();
+
+const _UA = (navigator.userAgent || '').toLowerCase();
+const IS_IOS = /ipad|iphone|ipod/.test(_UA);
+const IS_ANDROID = /android/.test(_UA);
+const IS_MOBILE = IS_IOS || IS_ANDROID || /mobile/i.test(_UA);
 
 function xhsKeyword(loc) {
   if(loc.xhsKeyword) return loc.xhsKeyword.trim();
@@ -539,6 +544,45 @@ function openExt(key, kind) {
 function openXhs(key) { return openExt(key, 'xhs'); }
 function openDp(key)  { return openExt(key, 'dp'); }
 
+/* ── 手机端智能打开：先尝试 App 跳转（隐藏 iframe，避免 Safari 报错），
+   未安装/被拦截时 1.5 秒后自动回退到网页搜索页 ── */
+function openXhsSmart(keyword) {
+  const app = 'xhsdiscover://search/result?keyword=' + encodeURIComponent(keyword) + '&target_search=notes&source=deeplink';
+  const web = 'https://www.xiaohongshu.com/search_result?keyword=' + encodeURIComponent(keyword) + '&source=web_explore_feed';
+  let settled = false;
+  const settle = (url) => { if (!settled) { settled = true; window.location.href = url; } };
+  const timer = setTimeout(() => settle(web), 1500);
+  const onLeave = () => { clearTimeout(timer); settled = true; };
+  document.addEventListener('visibilitychange', onLeave, { once: true });
+  window.addEventListener('pagehide', onLeave, { once: true });
+  const iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  iframe.src = app;
+  document.body.appendChild(iframe);
+  setTimeout(() => iframe.remove(), 3000);
+}
+function openDpSmart(keyword) {
+  const app = 'dianping://searchshoplist?keyword=' + encodeURIComponent(keyword);
+  const web = 'https://m.dianping.com/searchshop?keyword=' + encodeURIComponent(keyword);
+  let settled = false;
+  const settle = (url) => { if (!settled) { settled = true; window.location.href = url; } };
+  const timer = setTimeout(() => settle(web), 1500);
+  const onLeave = () => { clearTimeout(timer); settled = true; };
+  document.addEventListener('visibilitychange', onLeave, { once: true });
+  window.addEventListener('pagehide', onLeave, { once: true });
+  const iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  iframe.src = app;
+  document.body.appendChild(iframe);
+  setTimeout(() => iframe.remove(), 3000);
+}
+document.addEventListener('click', function (e) {
+  const xa = e.target.closest('a[data-xhs-keyword]');
+  if (xa && IS_MOBILE) { e.preventDefault(); openXhsSmart(xa.getAttribute('data-xhs-keyword')); return; }
+  const da = e.target.closest('a[data-dp-keyword]');
+  if (da && IS_MOBILE) { e.preventDefault(); openDpSmart(da.getAttribute('data-dp-keyword')); return; }
+});
+
 function locCard(loc, dayIdx) {
   const dot = loc.type==='food'?'food':loc.type==='spot'?'spot':loc.type==='drink'?'drink':loc.type==='hotel'?'hotel':'transport';
   const bdg = loc.type==='food'?'<span class="badge food">餐</span>':loc.type==='spot'?'<span class="badge spot">景</span>':loc.type==='drink'?'<span class="badge drink">饮</span>':'';
@@ -546,17 +590,19 @@ function locCard(loc, dayIdx) {
   const locKey = `${dayIdx}::${loc.name}`;
   const gmapQ = loc.gmap||encodeURIComponent(loc.name+' Tokyo');
   let lnk = `<button class="btn nav" onclick="openAS('${loc.name.replace(/'/g,"\\'")}',${loc.lat},${loc.lng},'${gmapQ}')">📍 导航</button>`;
+  const xhsLabel = IS_MOBILE ? '📕 小红书（手机打开）' : '📕 小红书搜索';
   if(loc.xhs||loc.xhsKeyword) {
-    lnk += `<a href="${xhsWebUrl(loc)}" target="_blank" class="btn xhs">📕 小红书搜索</a>`;
+    lnk += `<a href="${xhsWebUrl(loc)}" data-xhs-keyword="${xhsKeyword(loc)}" target="_blank" class="btn xhs">${xhsLabel}</a>`;
   }
   const dpEnabled = loc.dianping !== false &&
     (loc.dianping || loc.dianpingKeyword || loc.type==='food' || loc.type==='drink');
+  const dpLabel = IS_MOBILE ? '🍜 大众点评（手机打开）' : '🍜 大众点评';
   if(dpEnabled) {
-    lnk += `<a href="${dpWebUrl(loc)}" target="_blank" class="btn dp">🍜 大众点评</a>`;
+    lnk += `<a href="${dpWebUrl(loc)}" data-dp-keyword="${dpKeyword(loc)}" target="_blank" class="btn dp">${dpLabel}</a>`;
   }
   if(loc.reserve) lnk += `<a href="${loc.reserve}" target="_blank" class="btn rsv">📅 预约</a>`;
   let detailHtml = (loc.detail||'').replace(/\n/g,'<br>')
-    .replace(/href="https:\/\/www\.xiaohongshu\.com\/discovery\/item\/[^"]+"/g, 'href="'+xhsWebUrl(loc)+'"');
+    .replace(/href="https:\/\/www\.xiaohongshu\.com\/discovery\/item\/[^"]+"/g, 'href="'+xhsWebUrl(loc)+'" data-xhs-keyword="'+xhsKeyword(loc)+'"');
   return `<div class="tl-item"><div class="tl-dot ${dot}"></div><div class="card" onclick="if(!event.target.closest('.btn,.links'))toggle('${uid}')"><div class="time">${loc.time!=='—'?loc.time:'备选'}</div><div class="name">${bdg} ${loc.name}</div><div class="desc">${loc.desc}</div>${loc.budget?'<div class="budget">'+loc.budget+'</div>':''}${payChips(loc.pay)}<div class="links">${lnk}</div>${loc.detail?'<div class="details" id="'+uid+'">'+detailHtml+'</div>':''}</div></div>`;
 }
 
@@ -609,7 +655,6 @@ asOverlay.innerHTML = `<div class="as-sheet">
 document.body.appendChild(asOverlay);
 asOverlay.addEventListener('click', e => { if (e.target === asOverlay) closeAS(); });
 
-const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 function amapAppUrl(name, lat, lng) {
   const scheme = IS_IOS ? 'iosamap' : 'androidamap';
   return `${scheme}://viewMap?sourceApplication=trip&poiname=${encodeURIComponent(name)}&lat=${lat}&lon=${lng}&dev=0`;
