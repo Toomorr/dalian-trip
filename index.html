@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>大连 5 日行程地图 · 2026.8.14-8.19</title>
+<meta name="description" content="大连5日行程（最新版）：南海岸+海钓+东海岸赶海+东港+返程，交互地图与行程清单，含小红书可点击链接。">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="lib/leaflet.css" />
+<script src="lib/leaflet.js"></script>
+<style>
+/* ═══════════════════════════════════════════
+   Design System — edit :root to change theme
+   ═══════════════════════════════════════════ */
+:root {
+  --bg-primary:    #ffffff;
+  --bg-secondary:  #f5f5f7;
+  --bg-tertiary:   #fbfbfd;
+  --bg-grouped:    #f2f2f7;
+  --bg-elevated:   #ffffff;
+  --text-primary:   #1d1d1f;
+  --text-secondary: #86868b;
+  --text-tertiary:  #aeaeb2;
+  --accent:        #0071e3;
+  --accent-hover:  #0077ed;
+  --tint-red:    #ff3b30;
+  --tint-orange: #ff9500;
+  --tint-green:  #34c759;
+  --tint-blue:   #007aff;
+  --tint-purple: #af52de;
+  --tint-pink:   #ff2d55;
+  --separator:  rgba(60, 60, 67, .12);
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:  0 4px 14px rgba(0,0,0,.08);
+  --shadow-lg:  0 8px 30px rgba(0,0,0,.12);
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  20px;
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+               "Helvetica Neue", "Arial", sans-serif;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.47059;
+  letter-spacing: -0.022em;
+  overflow-anchor: none;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── 顶部区（地图+标签栏）：整体 sticky 锁定，地图随滚动从全屏缩到 40vh ── */
+#header { position: sticky; top: 0; z-index: 100; background: var(--bg-secondary); }
+#mapWrap { height: 100vh; overflow: hidden; background: var(--bg-secondary); }
+#map { width: 100%; height: 100%; }
+#spacer { height: 0; }
+.locate-btn {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: rgba(255,255,255,.92); backdrop-filter: blur(8px);
+  border: none; box-shadow: 0 1px 4px rgba(0,0,0,.18);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.locate-btn.active { color: #007aff; }
+@keyframes loc-pulse {
+  0%   { transform: scale(1); opacity: .55; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+.loc-pulse {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: rgba(0,122,255,.25);
+  animation: loc-pulse 1.6s ease-out infinite;
+}
+
+/* ── Tabs ── */
+.tabs {
+  display: flex; gap: 6px; padding: 12px 16px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  background: #ffffff;
+  border-bottom: .5px solid var(--separator); scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex-shrink: 0; padding: 7px 16px; border-radius: 980px; border: none;
+  background: var(--bg-grouped); color: var(--text-secondary);
+  font-size: 14px; font-weight: 500; cursor: pointer; transition: all .25s ease;
+  white-space: nowrap; letter-spacing: -0.01em;
+}
+.tab:active { transform: scale(.96); }
+.tab.active { background: var(--accent); color: #fff; }
+
+/* ── Main content ── */
+.content { max-width: 680px; margin: 0 auto; padding: 16px 16px calc(24px + var(--safe-bottom)); }
+
+/* ── Overview ── */
+.hero { text-align: center; padding: 28px 20px 20px; }
+.hero h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.15; }
+.hero .subtitle { font-size: 17px; color: var(--text-secondary); margin-top: 6px; font-weight: 400; }
+
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.info-card { background: var(--bg-elevated); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow-sm); }
+.info-card .label { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .02em; margin-bottom: 6px; }
+.info-card .value { font-size: 15px; font-weight: 600; line-height: 1.4; }
+
+/* ── Section headers ── */
+.section-head { font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .03em; padding: 20px 0 8px; }
+
+/* ── Day header ── */
+.day-head { padding: 20px 0 12px; }
+.day-head h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.day-head p { font-size: 15px; color: var(--text-secondary); margin-top: 2px; }
+
+/* ── Route bar ── */
+.route-bar { background: var(--bg-elevated); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 14px; box-shadow: var(--shadow-sm); font-size: 13px; color: var(--text-secondary); line-height: 1.7; white-space: pre-line; }
+.route-bar strong { color: var(--text-primary); }
+
+/* ── Timeline ── */
+.timeline { position: relative; padding-left: 24px; }
+.timeline::before { content: ''; position: absolute; left: 7px; top: 20px; bottom: 20px; width: 1.5px; background: var(--separator); }
+.tl-item { position: relative; margin-bottom: 10px; }
+.tl-dot { position: absolute; left: -20px; top: 18px; width: 10px; height: 10px; border-radius: 50%; z-index: 1; box-shadow: 0 0 0 3px var(--bg-secondary); }
+.tl-dot.food    { background: var(--tint-red); }
+.tl-dot.spot    { background: var(--tint-blue); }
+.tl-dot.hotel   { background: var(--tint-orange); }
+.tl-dot.drink   { background: var(--tint-purple); }
+.tl-dot.transport { background: var(--text-tertiary); }
+
+/* ── Card ── */
+.card { background: var(--bg-elevated); border-radius: var(--radius-md); padding: 14px 16px; box-shadow: var(--shadow-sm); transition: box-shadow .25s ease; cursor: pointer; }
+.card:active { box-shadow: var(--shadow-md); }
+.card .time { font-size: 12px; font-weight: 600; color: var(--text-tertiary); letter-spacing: .01em; }
+.card .name { font-size: 17px; font-weight: 600; margin: 2px 0 4px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 6px; }
+.card .desc { font-size: 14px; color: var(--text-secondary); line-height: 1.45; }
+
+/* Badge */
+.badge { display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 4px; }
+.badge.food   { background: rgba(255,59,48,.1);  color: var(--tint-red); }
+.badge.spot   { background: rgba(0,122,255,.1);  color: var(--tint-blue); }
+.badge.drink  { background: rgba(175,82,222,.1); color: var(--tint-purple); }
+
+/* Budget */
+.budget { display: inline-block; margin-top: 6px; padding: 3px 10px; background: var(--bg-grouped); border-radius: var(--radius-sm); font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+
+/* Payment */
+.pays { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+.pay { font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 600; }
+.pay.ok  { background: rgba(52,199,89,.1);  color: var(--tint-green); }
+.pay.no  { background: rgba(255,59,48,.08); color: var(--tint-red); }
+.pay.idk { background: rgba(255,149,0,.1);  color: var(--tint-orange); }
+
+/* Links row */
+.links { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 8px 14px; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 600; border: none; cursor: pointer;
+  text-decoration: none !important; transition: filter .2s;
+}
+.btn:active { filter: brightness(.9); }
+.btn.nav    { background: var(--accent); color: #fff; }
+.btn.xhs    { background: #ff2442; color: #fff; }
+.btn.dp     { background: #ffa700; color: #fff; }
+.btn.rsv    { background: var(--tint-green); color: #fff; }
+
+/* Action Sheet */
+.as-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,.35); backdrop-filter: blur(2px);
+  display: flex; align-items: flex-end; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .25s;
+}
+.as-overlay.show { opacity: 1; pointer-events: auto; }
+.as-sheet {
+  width: 100%; max-width: 420px;
+  padding: 0 8px 34px;
+  transform: translateY(100%); transition: transform .3s cubic-bezier(.22,1,.36,1);
+}
+.as-overlay.show .as-sheet { transform: translateY(0); }
+.as-group {
+  background: rgba(255,255,255,.88); backdrop-filter: blur(20px);
+  border-radius: 14px; overflow: hidden; margin-bottom: 8px;
+}
+.as-group .as-item {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 16px; font-size: 18px; color: #007aff; font-weight: 500;
+  border: none; background: none; width: 100%; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.as-group .as-item + .as-item { border-top: .5px solid rgba(0,0,0,.12); }
+.as-group .as-item:active { background: rgba(0,0,0,.06); }
+.as-cancel { font-weight: 600; }
+
+/* Details — default open */
+.details {
+  margin-top: 10px; padding-top: 10px;
+  border-top: .5px solid var(--separator);
+  font-size: 13px; color: var(--text-secondary); line-height: 1.6;
+}
+.details.closed { display: none; }
+
+/* ── Overview day list ── */
+.day-list .card { margin-bottom: 8px; }
+.day-list .card .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+
+/* ── Payment summary ── */
+.pay-summary { background: var(--bg-elevated); border-radius: var(--radius-md); padding: 14px 16px; box-shadow: var(--shadow-sm); font-size: 13px; line-height: 1.7; margin-bottom: 10px; }
+.pay-summary h4 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.pay-summary .warn { color: var(--tint-red); }
+.pay-summary .ok-text { color: var(--tint-green); }
+
+/* ── Legend ── */
+.legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 8px 0; font-size: 12px; color: var(--text-secondary); }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* ── 桌面端适配（手机保持移动优先样式） ── */
+@media (min-width: 768px) {
+  .content { max-width: 780px; }
+  body { font-size: 16.5px; }
+  .hero h1 { font-size: 34px; }
+  .tabs { padding: 14px 22px; gap: 8px; }
+  .card { padding: 16px 18px; }
+  .tab { font-size: 15px; }
+}
+
+/* ── Leaflet overrides ── */
+.xhsref {
+  margin-top: 8px; padding: 7px 9px 7px 10px;
+  background: rgba(255,36,66,.06); border-left: 3px solid #ff2442;
+  border-radius: 6px; font-size: 12.5px; line-height: 1.7; color: var(--text-secondary);
+}
+.xhsref .t { display: block; font-weight: 600; color: #ff2442; letter-spacing: .02em; }
+.xhsref a { color: #ff2442; text-decoration: underline; word-break: break-all; }
+.leaflet-popup-content-wrapper { border-radius: var(--radius-md) !important; box-shadow: var(--shadow-lg) !important; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif !important; }
+.leaflet-popup-content { font-size: 14px !important; line-height: 1.5 !important; margin: 12px 14px !important; }
+.leaflet-popup-content a { color: var(--accent) !important; }
+.leaflet-popup-tip { background: #fff !important; }
+.leaflet-control-zoom a { width: 34px !important; height: 34px !important; line-height: 34px !important; font-size: 16px !important; border-radius: 10px !important; background: rgba(255,255,255,.85) !important; -webkit-backdrop-filter: blur(10px) !important; backdrop-filter: blur(10px) !important; border: .5px solid var(--separator) !important; color: var(--text-primary) !important; }
+.leaflet-control-zoom { border-radius: 12px !important; overflow: hidden; box-shadow: var(--shadow-md) !important; border: none !important; }
+.leaflet-control-attribution { font-size: 9px !important; opacity: .5; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div id="mapWrap"><div id="map"></div></div>
+  <div class="tabs" id="tabs"></div>
+</div>
+<div id="spacer"></div>
+<div class="content" id="content"></div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  REPLACE THIS SECTION — Hotel and Days data                 ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+const HOTEL = { name: '曼居酒店（大连恒隆广场西安路地铁站店）', lat: 38.9145, lng: 121.5920 };
+
+const DAYS = [
+  { id: 0, label: '总览', color: '#0071e3', locations: [] },
+  {
+    id: 1, label: 'D0·抵达夜', date: '8月14日 周五', title: '抵达 · 深夜档', color: '#8e8e93',
+    locations: [
+      { name: 'G175 抵达 大连北站', lat: 39.0159, lng: 121.6025, type: 'transport', time: '22:14', desc: '18:30 北京朝阳 → 22:14 大连北', detail: '优先打车约30–40分钟到曼居酒店（约40–60元）；22点后地铁1号线末班风险大', gmap: '大连北站' },
+      { name: '曼居酒店（恒隆广场西安路地铁站店）', lat: 38.9145, lng: 121.5920, type: 'hotel', time: '23:00', desc: '沙河口区联合路116号 · 8/14–8/19 全程入住', detail: '近西安路/联合路地铁站（步行10分钟内），毗邻罗斯福商城', gmap: '大连 联合路116号 曼居酒店' },
+      { name: '深夜档·金碧辉煌海鲜烧烤', lat: 38.9158, lng: 121.5890, type: 'food', time: '23:30', desc: '营业到很晚，深夜接单稳', detail: '到店前电话确认23:30后是否接单；原则=就近吃完就回', budget: '¥80–150/人', pay: { cash: 1, alipay: 1, wechat: 1 }, xhsKeyword: '大连 金碧辉煌 海鲜烧烤', dianpingKeyword: '金碧辉煌海鲜烧烤 大连', gmap: '大连 金碧辉煌海鲜烧烤' },
+      { name: '备选·长兴里小吃街（西安路）', lat: 38.9205, lng: 121.5840, type: 'food', time: '—', desc: '中央大道B1 室内小吃市集，若23:00前能到', detail: '<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/67d284b6000000000602b89f" target="_blank" rel="noopener">《大连西安路长兴里》：焖子/铜锣烧/大黄米烙，21点后部分摊位收摊</a></div>', xhsKeyword: '大连 长兴里小吃街', dianpingKeyword: '长兴里小吃街', gmap: '大连 中央大道 长兴里' },
+      { name: '备选·北丐先生野馄饨烧烤', lat: 38.9150, lng: 121.5905, type: 'food', time: '—', desc: '人均50+，国潮深夜食堂', detail: '无独立小红书帖，用高德/大众点评确认位置与营业时间', xhsKeyword: '大连 北丐先生 野馄饨烧烤', dianpingKeyword: '北丐先生 大连', gmap: '大连 北丐先生' },
+      { name: '备选·绿江海鲜大排档（杏林街店）', lat: 38.9175, lng: 121.6470, type: 'food', time: '—', desc: '本地人宵夜顶流，从西安路打车约15分钟', detail: '<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/69e25762000000001a031149" target="_blank" rel="noopener">《大连深夜档》：本地人常去，宵夜顶流</a></div>', xhsKeyword: '大连 绿江海鲜大排档', dianpingKeyword: '绿江海鲜大排档 杏林街', gmap: '大连 绿江海鲜大排档' }
+    ]
+  },
+  {
+    id: 2, label: 'D1·南海岸', date: '8月15日 周六', title: '南海岸线 · 东→西单向（预案A）', color: '#0071e3',
+    locations: [
+      { name: '小岗（亲海栈道）', lat: 38.8650, lng: 121.6360, type: 'spot', time: '09:00', desc: '玻璃海·人少·可赶海', detail: '未开发石路，穿防滑鞋；小雨可走、雨大跳过；导航搜"亲海栈道"<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/68a414ed000000001c03c9c1" target="_blank" rel="noopener">《大连免费小众海滩攻略》：果冻海、人少、可赶海（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/68a046c4000000001b0233a1" target="_blank" rel="noopener">《没车学生别来》：木楼梯难走、偏僻但人多（差评）</a></div>', xhs: 'https://www.xiaohongshu.com/discovery/item/68a414ed000000001c03c9c1', xhsKeyword: '大连 小岗 亲海栈道', gmap: '大连 亲海栈道 小岗' },
+      { name: '付家庄海滨浴场', lat: 38.8660, lng: 121.6200, type: 'spot', time: '10:30', desc: '免费浴场，粗沙·喂海鸥·可扎帐篷', detail: '浪大注意离岸流、远离礁石；周六人多，早到+不下水只踩水<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/682c2bdd000000001200188c" target="_blank" rel="noopener">《最美滨海浴场》：免费、可扎帐篷、喂海鸥（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/68909a9a0000000023019f1a" target="_blank" rel="noopener">《交通与优缺点》：粗沙出片，但浪大流急、公交爆满（差评）</a></div>', xhs: 'https://www.xiaohongshu.com/discovery/item/682c2bdd000000001200188c', xhsKeyword: '大连 付家庄', gmap: '大连 付家庄海滨浴场' },
+      { name: '午餐·付家庄路边海鲜水饺店', lat: 38.8662, lng: 121.6195, type: 'food', time: '12:00', desc: '鲅鱼/海胆水饺、海肠捞饭、三鲜焖子', detail: '本地人私藏、不宰客<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/69ee0797000000001a037fd5" target="_blank" rel="noopener">《付家庄路边海鲜水饺店》：本地人私藏、不宰客</a></div>', budget: '¥60–80/人', pay: { cash: 1, alipay: 1, wechat: 1 }, xhs: 'https://www.xiaohongshu.com/discovery/item/69ee0797000000001a037fd5', xhsKeyword: '付家庄 海鲜水饺', dianpingKeyword: '付家庄 海鲜水饺', gmap: '大连 付家庄' },
+      { name: '银沙滩公园', lat: 38.8740, lng: 121.6065, type: 'spot', time: '13:30', desc: '网红S弯+礁石洞，纯拍照点', detail: '没有细沙，期望管理：只负责出片<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/68844bd40000000013010005" target="_blank" rel="noopener">《银沙滩逛拍超全攻略》：S弯+山洞+阶梯栈道5机位（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/665736dd000000001401b150" target="_blank" rel="noopener">《避雷银沙滩》：看海可以但别抱太大希望（差评）</a></div>', xhs: 'https://www.xiaohongshu.com/discovery/item/68844bd40000000013010005', xhsKeyword: '大连 银沙滩', gmap: '大连 银沙滩公园' },
+      { name: '星海湾跨海大桥（东岸）', lat: 38.8740, lng: 121.5845, type: 'spot', time: '14:30', desc: '东岸上桥口安全位拍照', detail: '不翻栏杆上岩石；19:30后亮灯<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/684311cf00000000230111fe" target="_blank" rel="noopener">《星海湾跨海大桥打卡攻略》：西侧1/3最佳，夏季19:30亮灯（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/66358b35000000001e03adc4" target="_blank" rel="noopener">《好看但要注意安全》：机位要翻护栏、石头后是悬崖（警示）</a></div>', xhs: 'https://www.xiaohongshu.com/discovery/item/684311cf00000000230111fe', xhsKeyword: '星海湾跨海大桥 机位', gmap: '大连 星海湾跨海大桥 东岸' },
+      { name: '莲花山观景台（索道上下）', lat: 38.8789, lng: 121.6039, type: 'spot', time: '15:45', desc: '俯瞰跨海大桥，赶18:53日落', detail: '门票20+缆车约29；争取16:00前上缆车；若停运走南2门下坡20分钟<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/69ddc7090000000023024ea0" target="_blank" rel="noopener">《星海湾跨海大桥绝美欣赏路线》：16:00索道上→日落→索道下（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/66b30dff000000001e01a4a7" target="_blank" rel="noopener">《8月千万别来莲花山观景台》：排队3小时（差评）</a></div>', budget: '¥50/人左右', pay: { cash: 1, alipay: 1, wechat: 1 }, xhs: 'https://www.xiaohongshu.com/discovery/item/69ddc7090000000023024ea0', xhsKeyword: '莲花山观景台', gmap: '大连 莲花山观景台' },
+      { name: '星海广场音乐喷泉', lat: 38.8812, lng: 121.5830, type: 'spot', time: '19:30', desc: '每场15分钟，结尾喷火', detail: '周六两场19:30/20:30，看19:30场；雨天停演<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/60fd77500000000021035d28" target="_blank" rel="noopener">《星海广场音乐喷泉攻略》：节奏感好、尾部有火焰（好评）</a><br>· <a href="https://m.dl.bendibao.com/xiuxian/88686.shtm" target="_blank" rel="noopener">本地宝：7-8月周五六日19:30+20:30两场（官方场次）</a></div>', xhs: 'https://www.xiaohongshu.com/discovery/item/60fd77500000000021035d28', xhsKeyword: '星海广场 音乐喷泉', gmap: '大连 星海广场' },
+      { name: '晚餐·仟万佳水饺（星海广场店）', lat: 38.8890, lng: 121.5805, type: 'food', time: '20:00', desc: '★本地海胆水饺：海胆/八爪鱼双拼、海肠捞饭29.9', detail: '中山路435号，会展中心地铁站旁；现包现煮；店面小饭点拼桌<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/669a235d00000000250172fb" target="_blank" rel="noopener">《一人食友好！仟万佳水饺》：海肠捞饭+海胆饺+八爪鱼饺（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/666fbb2e000000001d01615f" target="_blank" rel="noopener">《29.9的海肠捞饭谁懂啊》：会展中心B出口对面（好评）</a></div>', budget: '¥60–90/人', pay: { cash: 1, alipay: 1, wechat: 1 }, xhs: 'https://www.xiaohongshu.com/discovery/item/669a235d00000000250172fb', xhsKeyword: '仟万佳水饺', dianpingKeyword: '仟万佳水饺 星海广场', gmap: '大连 仟万佳水饺 会展中心' },
+      { name: '备选·奕景酒家（星海广场店）', lat: 38.8825, lng: 121.5750, type: 'food', time: '—', desc: '大连海鲜，星海广场边上', detail: '<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/67016e76000000001a0207b9" target="_blank" rel="noopener">《奕景酒家》：建议提前订座或17:30前到店避排队</a></div>', budget: '¥150–200/人', pay: { cash: 1, alipay: 1, wechat: 1 }, xhsKeyword: '奕景酒家 星海广场', dianpingKeyword: '奕景酒家 星海广场店', gmap: '大连 奕景酒家' },
+      { name: '备选·201有轨电车（B案雨天）', lat: 38.9220, lng: 121.6240, type: 'transport', time: '—', desc: 'D1预案B：雨天下午体验老电车', detail: '<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/65fd6e640000000012032aa4" target="_blank" rel="noopener">《乘坐&拍照攻略》：华乐广场—海之韵区间人少好拍（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/68e4ddbf00000000070307a8" target="_blank" rel="noopener">《201有轨电车》：人多、车慢、闷热（差评）</a></div>', xhsKeyword: '大连 201 有轨电车', gmap: '大连 201 有轨电车 大连站' },
+      { name: '备选·天津街/青泥洼（B案雨天）', lat: 38.9160, lng: 121.6270, type: 'spot', time: '—', desc: '百年老街+大商/柏威年室内', detail: '<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/69e85165000000001d019327" target="_blank" rel="noopener">《天津街》：百年老街、老大连味道</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/644af8b600000000130090df" target="_blank" rel="noopener">《青泥洼桥》：大商系商圈+小吃城（有游客说没找到小吃街）</a></div>', xhsKeyword: '大连 天津街 青泥洼桥', gmap: '大连 天津街' },
+      { name: '备选·西安路商圈（B案雨天）', lat: 38.9155, lng: 121.5850, type: 'spot', time: '—', desc: '罗斯福/中央大道/恒隆，就在酒店旁', detail: '<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/67d284b6000000000602b89f" target="_blank" rel="noopener">《西安路》：年轻化商圈+长兴里小吃街</a></div>', xhsKeyword: '大连 西安路', gmap: '大连 西安路 罗斯福' }
+    ]
+  },
+  {
+    id: 3, label: 'D2·海钓日', date: '8月16日 周日', title: '日出+休整+小平岛海钓（16:00-19:00固定）', color: '#ff9500',
+    locations: [
+      { name: '东港亲海步道·日出（视天气）', lat: 38.9250, lng: 121.6800, type: 'spot', time: '04:40', desc: '东向海面日出，看完回酒店补觉', detail: '阴雨（白海豚残涡）则取消、睡到自然醒；星海公园/星海广场D1已含，本日不再去<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/6709b402000000001a0223ef" target="_blank" rel="noopener">《东港白天实拍》：骑警+大船进出，白天傍晚各有看头（区域参考）</a></div>', xhs: 'https://www.xiaohongshu.com/discovery/item/6709b402000000001a0223ef', xhsKeyword: '大连 东港 日出', gmap: '大连 东港 国际会议中心' },
+      { name: '午餐·西安路简餐', lat: 38.9155, lng: 121.5850, type: 'food', time: '11:30', desc: '长兴里或恒隆/罗斯福商场餐厅', detail: '吃完直接出发去小平岛；午餐控制在1小时内<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/67d284b6000000000602b89f" target="_blank" rel="noopener">《西安路长兴里》：室内小吃市集</a></div>', budget: '¥50–100/人', pay: { cash: 1, alipay: 1, wechat: 1 }, xhsKeyword: '大连 长兴里', dianpingKeyword: '长兴里小吃街', gmap: '大连 西安路 长兴里' },
+      { name: '小平岛·圣汐湾/奕霖码头（海钓集合）', lat: 38.8309, lng: 121.5056, type: 'spot', time: '13:30', desc: '16:00-19:00 出海海钓（象鼻山海域）', detail: '13:30到码头报到穿戴；救生衣/渔具与俱乐部确认；取消政策以俱乐部为准（白海豚残涡8/16风浪大）<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/69f13e320000000038037c18" target="_blank" rel="noopener">《象鼻山桨板/海钓俱乐部》：奕霖码头出发、海上约3小时（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/689644f10000000025014911" target="_blank" rel="noopener">《大连，给我玩崩溃了》：闲鱼预约的海钓船与描述不符（警示，只走正规俱乐部）</a></div>', budget: '海钓人均约¥200+', pay: { cash: 1, alipay: 1, wechat: 1 }, xhs: 'https://www.xiaohongshu.com/discovery/item/69f13e320000000038037c18', xhsKeyword: '大连 小平岛 海钓', gmap: '大连 小平岛 圣汐湾国际游艇俱乐部' },
+      { name: '晚餐·小平岛渔港海鲜城（渔获加工）', lat: 38.8320, lng: 121.5070, type: 'food', time: '19:10', desc: '★渔获加工：清蒸10元/斤、辣炒15元/斤', detail: '当天现捞；有渔获直接加工，无渔获现买现做；先问价再加工<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/68d8958d0000000012033db9" target="_blank" rel="noopener">《小平岛中心广场》：渔港海鲜城可自挑海鲜加工，明码标价（好评）</a><br>· <a href="https://biu.qyer.com/p/wX5V6yklltIARWLSc7YV0A.html" target="_blank" rel="noopener">穷游：渔港早市扇贝10元/盆、加工费明码标价</a></div>', budget: '¥60/人左右', pay: { cash: 1, alipay: 1, wechat: 1 }, xhs: 'https://www.xiaohongshu.com/discovery/item/68d8958d0000000012033db9', xhsKeyword: '小平岛 渔港海鲜城', dianpingKeyword: '小平岛渔港海鲜城', gmap: '大连 小平岛 渔港海鲜城' },
+      { name: '备选·日丰园（小平岛总店）', lat: 38.8315, lng: 121.5060, type: 'food', time: '—', desc: '海肠水饺创始老店，渔获少时用', detail: '<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/6863805a0000000010012f99" target="_blank" rel="noopener">《40年老店》：亲海街小平岛48号楼，按头安利（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/68619365000000002400bc56" target="_blank" rel="noopener">《本地人私藏的鲜味密码》：海肠水饺爆汁、梭子蟹饱满</a></div>', budget: '¥100–150/人', pay: { cash: 1, alipay: 1, wechat: 1 }, xhsKeyword: '日丰园 海肠水饺', dianpingKeyword: '日丰园 小平岛总店', gmap: '大连 日丰园 小平岛' },
+      { name: '备选·星海广场喷泉（D1未看时）', lat: 38.8812, lng: 121.5830, type: 'spot', time: '—', desc: '雨停且D1没看成时补位', detail: '周日19:30+20:30两场', xhsKeyword: '星海广场 音乐喷泉', gmap: '大连 星海广场' }
+    ]
+  },
+  {
+    id: 4, label: 'D3·东海岸', date: '8月17日 周一', title: '菱角湾→渔人码头→石槽 · 西→东 + 赶海', color: '#34c759',
+    locations: [
+      { name: '菱角湾', lat: 38.8713, lng: 121.6789, type: 'spot', time: '09:00', desc: '眺望渔人码头经典机位', detail: '可自行前往（非正式景区，无门票），导航"老虎滩菱角湾停车场"<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/69d39f90000000002200060c" target="_blank" rel="noopener">《来大连总要去一次菱角湾》：海宁静治愈、超出片（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/685402d8000000002001a497" target="_blank" rel="noopener">《菱角湾》：商业化旅拍占机位、照片15元一张（差评）</a></div>', xhs: 'https://www.xiaohongshu.com/discovery/item/69d39f90000000002200060c', xhsKeyword: '大连 菱角湾', gmap: '大连 菱角湾 停车场' },
+      { name: '渔人码头', lat: 38.8760, lng: 121.6800, type: 'spot', time: '10:30', desc: '彩色房子+渔船+咖啡（阿汤/猫的天空之城）', detail: '不碰路边现烤摊；拍照30分钟足够<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/69d5fb6d0000000023005f80" target="_blank" rel="noopener">《藏在老虎滩的渔人码头》：彩色建筑群+渔船，油画质感（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/67d77245000000000d014321" target="_blank" rel="noopener">《避雷现烤海鲜》：海胆蒸蛋偷梁换柱（差评，别吃路边摊）</a></div>', xhs: 'https://www.xiaohongshu.com/discovery/item/69d5fb6d0000000023005f80', xhsKeyword: '大连 渔人码头', gmap: '大连 渔人码头 老虎滩' },
+      { name: '午餐·听浪·鱼生饭', lat: 38.8752, lng: 121.6796, type: 'food', time: '11:30', desc: '灯塔旁海景小店，当日现捕鱼生饭', detail: '<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/69f34784000000002003bfc6" target="_blank" rel="noopener">《听浪·鱼生饭》：灯塔旁海景，七款鱼生饭</a></div>', budget: '¥80–120/人', pay: { cash: 1, alipay: 1, wechat: 1 }, xhs: 'https://www.xiaohongshu.com/discovery/item/69f34784000000002003bfc6', xhsKeyword: '大连 听浪 鱼生饭', dianpingKeyword: '听浪 渔人码头', gmap: '大连 渔人码头 听浪' },
+      { name: '石槽/琥珀湾', lat: 38.8674, lng: 121.6926, type: 'spot', time: '12:30', desc: '漫咖啡琥珀湾店看海，体力缓冲', detail: '<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/69f16919000000002003ac3c" target="_blank" rel="noopener">《大连海边咖啡馆TOP8》：琥珀湾海景宜人、可亲海（好评）</a></div>', xhs: 'https://www.xiaohongshu.com/discovery/item/69f16919000000002003ac3c', xhsKeyword: '大连 琥珀湾', gmap: '大连 琥珀湾 石槽' },
+      { name: '石槽子赶海（16:00-18:00）', lat: 38.8666, lng: 121.6906, type: 'spot', time: '15:45', desc: '★2小时+赶海：螃蟹/海蛎子/海虹/花蚬子', detail: '8/17干潮19:00（初五大潮），18:30前必须上岸；穿防滑鞋、带小桶手套<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/66f6472d000000001b0234f3" target="_blank" rel="noopener">《石槽琥珀湾赶海攻略》：生蚝/贻贝/海葵/螃蟹/小鱼（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/66ba3241000000000d0324b0" target="_blank" rel="noopener">《六天赶五海》：石槽村离渔人码头1公里，小螃蟹很多（实测）</a></div>', xhs: 'https://www.xiaohongshu.com/discovery/item/66f6472d000000001b0234f3', xhsKeyword: '大连 石槽 赶海', gmap: '大连 石槽村 琥珀湾' },
+      { name: '晚餐·正黄旗海鲜烧烤（港湾广场店）', lat: 38.9258, lng: 121.6555, type: 'food', time: '18:15', desc: '烤牛舌9元/串、烤海肠、蒸黄蚬子', detail: '营业至24:00；定位"尝鲜游客店"，点海鲜别点普通肉串<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/69b11734000000002602de88" target="_blank" rel="noopener">《正黄旗海鲜烧烤》：烤牛舌/海肠/蒸黄蚬子（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/6857bcd90000000013010648" target="_blank" rel="noopener">《合格的游客店》：肉串一般、海肠选品好（中性）</a></div>', budget: '¥150/人左右', pay: { cash: 1, alipay: 1, wechat: 1 }, xhs: 'https://www.xiaohongshu.com/discovery/item/69b11734000000002602de88', xhsKeyword: '正黄旗 海鲜烧烤', dianpingKeyword: '正黄旗海鲜烧烤 港湾广场', gmap: '大连 正黄旗 港湾广场' },
+      { name: '备选·201有轨电车（回城）', lat: 38.9220, lng: 121.6240, type: 'transport', time: '—', desc: '港湾广场→大连站段体验', detail: '<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/65fd6e640000000012032aa4" target="_blank" rel="noopener">《201电车乘坐&拍照攻略》：区间车人少好拍</a></div>', xhsKeyword: '大连 201 有轨电车', gmap: '大连 港湾广场 201电车' }
+    ]
+  },
+  {
+    id: 5, label: 'D4·市区日', date: '8月18日 周二', title: '东港威尼斯 → 桃源加工午餐 → 索道 → 逛街', color: '#af52de',
+    locations: [
+      { name: '东港·威尼斯水城（白天游）', lat: 38.9255, lng: 121.6802, type: 'spot', time: '09:00', desc: '免费街区+贡多拉60元/人，白天建筑清晰', detail: '上午排队少；贡多拉运营时间各帖口径不一（09:00-21:00 vs 09:30-17:30），现场确认<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/64db3c1a000000000103fb44" target="_blank" rel="noopener">《威尼斯水城+东港攻略》：免费街区、贡多拉60元约10分钟（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/66a84b1e000000001c011c06" target="_blank" rel="noopener">《贡多拉实测》：60元/15分钟，运营约09:30-17:30（注意口径不同）</a></div>', budget: '贡多拉60元/人', pay: { cash: 1, alipay: 1, wechat: 1 }, xhs: 'https://www.xiaohongshu.com/discovery/item/64db3c1a000000000103fb44', xhsKeyword: '大连 威尼斯水城 贡多拉', dianpingKeyword: '大连海昌东方水城', gmap: '大连 威尼斯水城 东港' },
+      { name: '桃源市场（买海鲜）', lat: 38.8835, lng: 121.6505, type: 'spot', time: '11:15', desc: '★市场买海鲜：螃蟹/贝类/海胆', detail: '解放路604号（桃源桥旁），地铁5号线桃源站C口；市场营业至18:30，上午货仍新鲜<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/68a42424000000001c00f923" target="_blank" rel="noopener">《大连逛早市vlog》：买海鲜必打卡桃源市场</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/68d7af2e000000001201fb35" target="_blank" rel="noopener">《桃源海鲜市场》：价格合适、加工费明码标价</a></div>', xhs: 'https://www.xiaohongshu.com/discovery/item/68a42424000000001c00f923', xhsKeyword: '大连 桃源市场', gmap: '大连 桃源市场 解放路' },
+      { name: '午餐·皇家隐厨（市场内加工）', lat: 38.8836, lng: 121.6508, type: 'food', time: '11:30', desc: '★海鲜加工：市场内A099/B125，加工费约50元/人', detail: '先问价再下单；口碑两极，选明码标价、人多排队的摊位<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/674556890000000008005cc2" target="_blank" rel="noopener">《皇家隐厨好评》：市场内加工、约50元</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/68c11570000000001b03549c" target="_blank" rel="noopener">《喜欢做m的可以去皇家隐厨》：服务员态度差（差评）</a></div>', budget: '¥50–80/人（加工+海鲜）', pay: { cash: 1, alipay: 1, wechat: 1 }, xhs: 'https://www.xiaohongshu.com/discovery/item/674556890000000008005cc2', xhsKeyword: '皇家隐厨 海鲜加工', dianpingKeyword: '皇家隐厨 桃源市场', gmap: '大连 桃源市场 皇家隐厨' },
+      { name: '劳动公园·富斯特索道/滑道', lat: 38.9070, lng: 121.6210, type: 'spot', time: '13:45', desc: '索道上山俯瞰城景，滑道下山约70元', detail: '营业约09:00-20:30；恐高直接选滑道；价格以现场为准<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/66b8d96c0000000005039338" target="_blank" rel="noopener">《必玩景点·劳动公园》：索道很稳（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/66ca946d000000001d038017" target="_blank" rel="noopener">《索道避雷》：保护杆简陋，恐高别试（差评）</a></div>', budget: '¥70/人左右', pay: { cash: 1, alipay: 1, wechat: 1 }, xhs: 'https://www.xiaohongshu.com/discovery/item/66b8d96c0000000005039338', xhsKeyword: '大连 劳动公园 索道', gmap: '大连 劳动公园 富斯特索道' },
+      { name: '西安路商圈（逛街+晚餐）', lat: 38.9155, lng: 121.5850, type: 'spot', time: '15:45', desc: '罗斯福/中央大道/恒隆/长兴里', detail: '累了随时回酒店<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/67d284b6000000000602b89f" target="_blank" rel="noopener">《西安路》：年轻化商圈+长兴里小吃街</a></div>', xhsKeyword: '大连 西安路', gmap: '大连 西安路 罗斯福' },
+      { name: '备选·黑石礁赶海补位', lat: 38.8707, lng: 121.5561, type: 'spot', time: '—', desc: '若D3赶海因雨未成：8/18干潮20:00，17:30-19:30窗口', detail: '<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/6857f72a000000000d0277eb" target="_blank" rel="noopener">《黑石礁公园亲测指南》：退潮黑礁迷宫，日落木栈道出片</a></div>', xhsKeyword: '大连 黑石礁 赶海', gmap: '大连 黑石礁公园' }
+    ]
+  },
+  {
+    id: 6, label: 'D5·返程日', date: '8月19日 周三', title: '南山路/七七街 → 阿水生鱼饭 → 12:00退房返程', color: '#ff3b30',
+    locations: [
+      { name: '南山路文创街区 + 七七街', lat: 38.9060, lng: 121.6400, type: 'spot', time: '08:30', desc: '2小时自由行：中古店/咖啡馆/艺术园区', detail: '早段人少适合拍照，咖啡馆10:00后陆续开门；路线=旧物仓→南山路11号艺术园区→七七街<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/691a8c290000000007038f3e" target="_blank" rel="noopener">《南山路citywalk》：全程2-3km，中古店/咖啡/画廊集中（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/6815a3f100000000230175e9" target="_blank" rel="noopener">《旧物仓中古店》：适合淘小东西</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/68e5d08b0000000005001f3d" target="_blank" rel="noopener">《南山路11号艺术园区》：展陈+小店</a></div>', xhs: 'https://www.xiaohongshu.com/discovery/item/691a8c290000000007038f3e', xhsKeyword: '大连 南山路 文创街区', gmap: '大连 南山路 七七街' },
+      { name: '午餐·阿水的生鱼饭（长江路店）', lat: 38.9235, lng: 121.6265, type: 'food', time: '10:45', desc: '★生鱼饭：长江路451号，每份49元', detail: '11:00午市开始，到店排队取号；若排队超15分钟改打包/民主广场店<div class="xhsref"><span class="t">📕 小红书参考</span>· <a href="https://www.xiaohongshu.com/discovery/item/690e9f1a0000000003034626" target="_blank" rel="noopener">《一个人的生鱼便当》：工作日不用排队，加生鸡蛋口感好（好评）</a><br>· <a href="https://www.xiaohongshu.com/discovery/item/680f3c440000000007037092" target="_blank" rel="noopener">《比较一般，不推荐》：口味偏淡/等待久（差评）</a></div>', budget: '¥49-80/人', pay: { cash: 1, alipay: 1, wechat: 1 }, xhs: 'https://www.xiaohongshu.com/discovery/item/690e9f1a0000000003034626', xhsKeyword: '阿水的生鱼饭 长江路', dianpingKeyword: '阿水的生鱼饭', gmap: '大连 长江路451号 阿水生鱼饭' },
+      { name: '大连北站（G169 13:58 返程）', lat: 39.0159, lng: 121.6025, type: 'transport', time: '12:15', desc: '12:15前上出租车 → 12:45-12:50到大连北', detail: '13:58发车 → 17:36到北京朝阳；安检+候车缓冲约65分钟', gmap: '大连北站' }
+    ]
+  }
+];
+
+/* 页面始终从顶部全屏地图开始（避免浏览器恢复上次滚动位置） */
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+window.addEventListener('load', () => requestAnimationFrame(() => window.scrollTo(0, 0)));
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  REPLACE THIS SECTION — Overview tab content                ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+function overviewContent() {
+  return `
+<div class="hero"><h1>大连 5 日行程地图</h1><p class="subtitle">2026.8.14 抵 · 8.19 返 · 南海岸 → 海钓 → 东海岸赶海 → 市区 → 返程</p></div>
+<div class="info-grid">
+  <div class="info-card"><div class="label">酒店</div><div class="value">曼居酒店（恒隆广场西安路地铁站店）<br>联合路116号 · 8/14–8/19 全程</div></div>
+  <div class="info-card"><div class="label">高铁</div><div class="value">G175 8/14 22:14 抵大连北<br>G169 8/19 13:58 大连北发 → 17:36 到北京朝阳</div></div>
+  <div class="info-card"><div class="label">天气</div><div class="value">24–31℃ 逐3小时表见总览下方<br>每小时自动刷新（中央气象台）</div></div>
+  <div class="info-card"><div class="label">预估费用</div><div class="value">约 ¥2,500–3,500/人<br>含返程票·住宿·海钓·餐饮</div></div>
+</div>
+<div class="section-head">⚠️ 台风"白海豚"与潮汐（出发前必读）</div>
+<div class="pay-summary">
+  <div class="warn">白海豚（2026年第13号台风）已停编但残涡活跃：8/15 小雨、8/15夜–8/16 小到中雨、近海阵风7–8级概率大。</div>
+  <div>→ D1（8/15）南海岸请优先准备预案B（室内）；D2（8/16）日出大概率看不到、海钓以俱乐部通知为准。</div>
+  <div class="ok-text">→ 8/17 转晴：东海岸+石槽子赶海主窗口（干潮19:00，16:00–18:30下滩，18:30前上岸）。</div>
+  <div>→ 8/18 干潮20:00，黑石礁/付家庄为赶海补位；详细版文档见 <a href="大连行程规划-详细版.md" target="_blank">大连行程规划-详细版.md</a>，天气逐3小时表见 <a href="大连天气-2小时预报.md" target="_blank">大连天气-2小时预报.md</a>。</div>
+</div>
+<div class="section-head">行程概览</div>
+<div class="day-list">${DAYS.slice(1).map(d=>`<div class="card" onclick="go(${d.id})"><div class="name"><span class="dot" style="background:${d.color}"></span>${d.label} · ${d.title}</div><div class="desc">${d.date}</div></div>`).join('')}</div>
+<div class="section-head">支付提醒</div>
+<div class="pay-summary"><h4>必吃三件套</h4>★ 阿水生鱼饭（D5午餐）· ★ 仟万佳海胆水饺（D1晚餐）· ★ 桃源市场+皇家隐厨海鲜加工（D4午餐）。<span class="ok-text">支付：现金/支付宝/微信基本全覆盖。</span></div>
+<div class="pay-summary"><h4>避雷备忘</h4><span class="warn">渔人码头路边现烤摊有"海胆蒸蛋偷梁换柱"投诉，只吃固定门店；皇家隐厨服务口碑两极，先问加工费再下单；品海楼东港店有"未告知收费"差评，点单前逐项确认。</span></div>
+<div class="pay-summary"><h4>坐标说明</h4>本页坐标为 OSM/维基/公开地图源交叉校准（误差约±200m），实际导航请用每张卡片的"📍导航"（高德/Apple/Google）。</div>
+<div class="section-head">图例</div>
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--tint-red)"></div>餐厅</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--tint-blue)"></div>景点</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--tint-orange)"></div>酒店</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--text-tertiary)"></div>交通</div>
+</div>`;
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  ENGINE — Do not modify below unless customizing behavior   ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+const map = L.map('map', {
+  center: [HOTEL.lat || 35.69, HOTEL.lng || 139.74],
+  zoom: 12, zoomControl: false, attributionControl: true,
+  scrollWheelZoom: false,  // 滚轮/触控板两指滑动 = 页面滚动，不缩放地图
+  touchZoom: true,          // 触屏双指捏合 = 缩放
+  doubleClickZoom: true,    // 双击/双点缩放
+  dragging: true            // 单指/鼠标拖拽 = 平移地图
+});
+L.control.zoom({ position: 'topright' }).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+window.__map = map; // 便于调试/测试读取缩放级别
+
+/* ── 仅捏合缩放：触控板捏合=ctrl+滚轮，予以缩放；普通滚动不干预 ── */
+L.DomEvent.on(map.getContainer(), 'wheel', function (e) {
+  if (e.ctrlKey) {
+    e.preventDefault();
+    if (e.deltaY < 0) map.zoomIn(1); else map.zoomOut(1);
+  }
+});
+
+/* ── 滚动联动：地图全屏→随滚动缩至 40vh 锁定；spacer 补偿使内容以 1 倍速、贴着地图下缘滚动 ── */
+const mapWrap = document.getElementById('mapWrap');
+const spacer = document.getElementById('spacer');
+const MAP_MIN_VH = 0.40; // 缩小后锁定高度（与旧版半屏一致）
+let mapTick = false;
+function resizeMapByScroll() {
+  const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+  const sc = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+  const h = Math.max(vh * MAP_MIN_VH, vh - sc);
+  if (mapWrap) mapWrap.style.height = Math.round(h) + 'px';
+  if (spacer) spacer.style.height = Math.max(0, Math.round(vh - h)) + 'px';
+  map.invalidateSize();
+  mapTick = false;
+}
+function onMapScroll() {
+  if (!mapTick) { mapTick = true; requestAnimationFrame(resizeMapByScroll); }
+}
+window.addEventListener('scroll', onMapScroll, { passive: true });
+window.addEventListener('resize', onMapScroll, { passive: true });
+resizeMapByScroll();
+
+/* ── Geolocation ── */
+const LocateControl = L.Control.extend({
+  options: { position: 'bottomright' },
+  onAdd() {
+    const btn = L.DomUtil.create('button', 'locate-btn');
+    btn.innerHTML = '📍';
+    btn.title = '我的位置';
+    L.DomEvent.disableClickPropagation(btn);
+    btn.addEventListener('click', () => {
+      btn.classList.add('active');
+      map.locate({ setView: true, maxZoom: 15 });
+    });
+    this._btn = btn;
+    return btn;
+  }
+});
+new LocateControl().addTo(map);
+let locMarker, locCircle;
+map.on('locationfound', e => {
+  const r = e.accuracy / 2;
+  if (locMarker) { locMarker.setLatLng(e.latlng); locCircle.setLatLng(e.latlng).setRadius(r); }
+  else {
+    locMarker = L.marker(e.latlng, {
+      icon: L.divIcon({ className:'', html:'<div style="width:14px;height:14px;border-radius:50%;background:#007aff;border:2.5px solid #fff;box-shadow:0 0 6px rgba(0,122,255,.5)"></div><div class="loc-pulse" style="position:absolute;top:0;left:0"></div>', iconSize:[14,14], iconAnchor:[7,7] }),
+      zIndexOffset: 2000
+    }).addTo(map);
+    locCircle = L.circle(e.latlng, { radius: r, color: '#007aff', fillColor: '#007aff', fillOpacity: .08, weight: 1 }).addTo(map);
+  }
+});
+map.on('locationerror', () => {});
+
+function icon(color, emoji) {
+  return L.divIcon({ className: '', html: `<div style="width:28px;height:28px;border-radius:50%;background:${color};border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.18)">${emoji||''}</div>`, iconSize: [28,28], iconAnchor: [14,14], popupAnchor: [0,-16] });
+}
+
+if (HOTEL.lat) L.marker([HOTEL.lat, HOTEL.lng], { icon: icon('#ff9500','🏨'), zIndexOffset: 1000 }).addTo(map).bindPopup(`<b>${HOTEL.name}</b>`);
+
+let markers = [], polylines = [];
+const emojis = { food:'🍽️', spot:'📍', hotel:'🏨', transport:'🚃', drink:'🍺' };
+
+function clearMap() { markers.forEach(m=>map.removeLayer(m)); polylines.forEach(p=>map.removeLayer(p)); markers=[]; polylines=[]; }
+
+function showDay(idx) {
+  clearMap();
+  if (idx === 0) {
+    const pts = [];
+    DAYS.forEach(d => d.locations.forEach(l => { if(l.lat) pts.push([l.lat,l.lng]); }));
+    if(pts.length) map.fitBounds(pts, {padding:[30,30]});
+    DAYS.slice(1).forEach(d => {
+      d.locations.filter(l=>l.time!=='—').forEach(l => {
+        const m = L.circleMarker([l.lat,l.lng], { radius:4, fillColor:d.color, color:'#fff', weight:1.5, fillOpacity:.9 }).addTo(map).bindPopup(`<b>${l.name}</b><br><span style="color:#86868b">${d.label}</span>`);
+        markers.push(m);
+      });
+    });
+    return;
+  }
+  const day = DAYS.find(d=>d.id===idx);
+  if(!day) return;
+  const coords = [];
+  day.locations.forEach(l => {
+    if(!l.lat) return;
+    const m = L.marker([l.lat,l.lng], { icon: icon(day.color, emojis[l.type]||'📌') }).addTo(map);
+    const gmapQ = l.gmap||encodeURIComponent(l.name+' Tokyo');
+    m.bindPopup(`<b>${l.name}</b>${l.time!=='—'?'<br><span style="color:#86868b">'+l.time+'</span>':''}<br>${l.desc}${l.budget?'<br><span style="color:#ff9500">'+l.budget+'</span>':''}<br><a href="#" onclick="event.preventDefault();openAS('${l.name.replace(/'/g,"\\'")}',${l.lat},${l.lng},'${gmapQ}')">📍 导航</a>${(l.xhs||l.xhsKeyword)?' · <a href="'+xhsWebUrl(l)+'" target="_blank">📕 小红书</a>':''}`);
+    markers.push(m);
+    if(l.time!=='—') coords.push([l.lat,l.lng]);
+  });
+  if(coords.length>1) { const pl = L.polyline(coords, { color:day.color, weight:2.5, opacity:.5, dashArray:'6,5' }).addTo(map); polylines.push(pl); }
+  if(coords.length) map.fitBounds(coords, { padding:[40,40], maxZoom:14 });
+}
+
+// ══════════ RENDER ══════════
+function payChips(pay) {
+  if(!pay) return '';
+  let h = '<div class="pays">';
+  const m = { cash:'💴', card:'💳', suica:'Suica', paypay:'PayPay', alipay:'支付宝', wechat:'微信' };
+  for(const [k,label] of Object.entries(m)) {
+    if(pay[k]!==undefined) { const c = pay[k]===1?'ok':pay[k]===0.5?'idk':'no'; h += `<span class="pay ${c}">${label}</span>`; }
+  }
+  return h+'</div>';
+}
+
+// ── 运行环境检测：在第三方 App 的 WebView 里，自定义 scheme 基本会被拦截 ──
+const IN_APP_WEBVIEW = (() => {
+  const ua = (navigator.userAgent || '').toLowerCase();
+  return /micromessenger|xhs|xhsdiscover|discover\/|tiktok|aweme|weibo|qq\/|qqbrowser|alipayclient|dingtalk|lark|feishu|ucbrowser|baiduboxapp|toutiao|newsarticle/.test(ua);
+})();
+
+function xhsKeyword(loc) {
+  if(loc.xhsKeyword) return loc.xhsKeyword.trim();
+  return (loc.name||'').replace(/⭐.*$/g,'').replace(/（.*?）/g,'').replace(/\(.*?\)/g,'').replace(/\s+/g,' ').trim();
+}
+function xhsAppUrl(loc) { return `xhsdiscover://search/result?keyword=${encodeURIComponent(xhsKeyword(loc))}&target_search=notes&source=deeplink`; }
+function xhsWebUrl(loc) { return `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(xhsKeyword(loc))}&source=web_explore_feed`; }
+
+function dpKeyword(loc) {
+  if(loc.dianpingKeyword) return loc.dianpingKeyword.trim();
+  return (loc.name||'').replace(/⭐.*$/g,'').replace(/（.*?）/g,'').replace(/\(.*?\)/g,'').replace(/\s+/g,' ').trim();
+}
+function dpAppUrl(loc) { return `dianping://searchshoplist?keyword=${encodeURIComponent(dpKeyword(loc))}`; }
+function dpWebUrl(loc) { return `https://m.dianping.com/searchshop?keyword=${encodeURIComponent(dpKeyword(loc))}`; }
+
+window._extLocs = {};
+DAYS.forEach(d => d.locations.forEach(l => { window._extLocs[`${d.id}::${l.name}`] = l; }));
+window._xhsLocs = window._extLocs;
+
+function openExt(key, kind) {
+  const loc = window._extLocs[key]; if(!loc) return false;
+  if (IN_APP_WEBVIEW) {
+    window.location.href = kind==='dp' ? dpWebUrl(loc) : xhsWebUrl(loc);
+  } else {
+    window.location.href = kind==='dp' ? dpAppUrl(loc) : xhsAppUrl(loc);
+  }
+  return false;
+}
+function openXhs(key) { return openExt(key, 'xhs'); }
+function openDp(key)  { return openExt(key, 'dp'); }
+
+function locCard(loc, dayIdx) {
+  const dot = loc.type==='food'?'food':loc.type==='spot'?'spot':loc.type==='drink'?'drink':loc.type==='hotel'?'hotel':'transport';
+  const bdg = loc.type==='food'?'<span class="badge food">餐</span>':loc.type==='spot'?'<span class="badge spot">景</span>':loc.type==='drink'?'<span class="badge drink">饮</span>':'';
+  const uid = `d${dayIdx}-${loc.name.replace(/\W/g,'')}`;
+  const locKey = `${dayIdx}::${loc.name}`;
+  const gmapQ = loc.gmap||encodeURIComponent(loc.name+' Tokyo');
+  let lnk = `<button class="btn nav" onclick="openAS('${loc.name.replace(/'/g,"\\'")}',${loc.lat},${loc.lng},'${gmapQ}')">📍 导航</button>`;
+  if(loc.xhs||loc.xhsKeyword) {
+    lnk += `<a href="${xhsWebUrl(loc)}" target="_blank" class="btn xhs">📕 小红书搜索</a>`;
+  }
+  const dpEnabled = loc.dianping !== false &&
+    (loc.dianping || loc.dianpingKeyword || loc.type==='food' || loc.type==='drink');
+  if(dpEnabled) {
+    lnk += `<a href="${dpWebUrl(loc)}" target="_blank" class="btn dp">🍜 大众点评</a>`;
+  }
+  if(loc.reserve) lnk += `<a href="${loc.reserve}" target="_blank" class="btn rsv">📅 预约</a>`;
+  let detailHtml = (loc.detail||'').replace(/\n/g,'<br>')
+    .replace(/href="https:\/\/www\.xiaohongshu\.com\/discovery\/item\/[^"]+"/g, 'href="'+xhsWebUrl(loc)+'"');
+  return `<div class="tl-item"><div class="tl-dot ${dot}"></div><div class="card" onclick="if(!event.target.closest('.btn,.links'))toggle('${uid}')"><div class="time">${loc.time!=='—'?loc.time:'备选'}</div><div class="name">${bdg} ${loc.name}</div><div class="desc">${loc.desc}</div>${loc.budget?'<div class="budget">'+loc.budget+'</div>':''}${payChips(loc.pay)}<div class="links">${lnk}</div>${loc.detail?'<div class="details" id="'+uid+'">'+detailHtml+'</div>':''}</div></div>`;
+}
+
+function renderDay(idx) {
+  const d = DAYS.find(x=>x.id===idx); if(!d) return '';
+  const main = d.locations.filter(l=>l.time!=='—');
+  const alt = d.locations.filter(l=>l.time==='—');
+  let h = `<div class="day-head"><h2>${d.title}</h2><p>${d.date}</p></div>`;
+  if(main.length) { h += '<div class="section-head">行程</div><div class="timeline">'; main.forEach(l => h += locCard(l, idx)); h += '</div>'; }
+  if(alt.length) { h += '<div class="section-head">备选</div><div class="timeline">'; alt.forEach(l => h += locCard(l, idx)); h += '</div>'; }
+  return h;
+}
+
+// ══════════ NAV ══════════
+let cur = 0;
+const tabsEl = document.getElementById('tabs');
+const contentEl = document.getElementById('content');
+
+DAYS.forEach(d => {
+  const btn = document.createElement('button');
+  btn.className = 'tab' + (d.id===0?' active':'');
+  btn.dataset.day = d.id;
+  btn.textContent = d.label;
+  tabsEl.appendChild(btn);
+});
+
+function go(idx) {
+  cur = idx;
+  tabsEl.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', +t.dataset.day===idx));
+  contentEl.innerHTML = idx===0 ? overviewContent() : renderDay(idx);
+  showDay(idx);
+  contentEl.scrollTo({top:0});
+  const tab = tabsEl.querySelector(`[data-day="${idx}"]`);
+  if(tab) tab.scrollIntoView({behavior:'smooth', inline:'center', block:'nearest'});
+}
+
+function toggle(id) { const el=document.getElementById(id); if(el) el.classList.toggle('closed'); }
+
+tabsEl.addEventListener('click', e => { const t=e.target.closest('.tab'); if(t) go(+t.dataset.day); });
+
+go(0);
+
+/* ── Action Sheet for Navigation ── */
+const asOverlay = document.createElement('div');
+asOverlay.className = 'as-overlay';
+asOverlay.innerHTML = `<div class="as-sheet">
+  <div class="as-group" id="as-opts"></div>
+  <div class="as-group"><button class="as-item as-cancel" onclick="closeAS()">取消</button></div>
+</div>`;
+document.body.appendChild(asOverlay);
+asOverlay.addEventListener('click', e => { if (e.target === asOverlay) closeAS(); });
+
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+function amapAppUrl(name, lat, lng) {
+  const scheme = IS_IOS ? 'iosamap' : 'androidamap';
+  return `${scheme}://viewMap?sourceApplication=trip&poiname=${encodeURIComponent(name)}&lat=${lat}&lon=${lng}&dev=0`;
+}
+function amapWebUrl(name, lat, lng) {
+  return `https://uri.amap.com/marker?position=${lng},${lat}&name=${encodeURIComponent(name)}&src=trip&coordinate=wgs84&callnative=1`;
+}
+function openAmap(name, lat, lng) {
+  if (IN_APP_WEBVIEW) { window.open(amapWebUrl(name, lat, lng)); return; }
+  window.location.href = amapAppUrl(name, lat, lng);
+}
+
+function openAS(name, lat, lng, gmap) {
+  const q = gmap || encodeURIComponent(name + ' Tokyo');
+  const encName = encodeURIComponent(name);
+  const safeName = name.replace(/'/g,"\\'");
+  // WebView 内 maps:// 通常被拦截，改用 https Apple Maps URL —— iOS 系统会自动拉起 Apple Maps
+  const appleUrl = IN_APP_WEBVIEW
+    ? `https://maps.apple.com/?q=${lat},${lng}&ll=${lat},${lng}&name=${encName}`
+    : `maps://maps.apple.com/?q=${lat},${lng}&name=${encName}`;
+  const googleUrl = `https://www.google.com/maps/search/?api=1&query=${q}`;
+  document.getElementById('as-opts').innerHTML =
+    `<button class="as-item" onclick="window.open('${appleUrl}');closeAS()">🍎 Apple Maps</button>` +
+    `<button class="as-item" onclick="window.open('${googleUrl}');closeAS()">🗺️ Google Maps</button>` +
+    `<button class="as-item" onclick="openAmap('${safeName}',${lat},${lng});closeAS()">🧭 高德地图 App</button>`;
+  asOverlay.classList.add('show');
+}
+function closeAS() { asOverlay.classList.remove('show'); }
+</script>
+</body>
+</html>
