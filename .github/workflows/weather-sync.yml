@@ -1,0 +1,46 @@
+name: 天气同步（大连·沙河口区）
+
+on:
+  schedule:
+    # 每小时第 0 分执行（UTC 16:00 对应北京时间 00:00）
+    - cron: '0 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weather-sync
+  cancel-in-progress: false
+
+env:
+  TZ: Asia/Shanghai
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 同步天气（抓取失败也会写入 FAIL 日志，不中断提交）
+        run: |
+          python3 sync_weather.py || true
+
+      - name: 提交天气更新
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "大连天气-2小时预报.md" "大连天气-同步日志.md"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: 自动同步大连沙河口区天气 $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          else
+            echo "数据无变化，跳过提交"
+          fi

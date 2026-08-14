@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""大连天气预报同步脚本（由 launchd 每小时触发）。
+"""大连·沙河口区天气预报同步脚本（由 GitHub Actions 每小时触发）。
 
 主数据源：中国天气网 weather.com.cn（中央气象台/中国气象局官方公众服务），
-大连城市代码 101070201，公开接口最细粒度为"逐 3 小时"（每天 8 个时次）。
+沙河口区代码 101070210（对应酒店所在地：西安路/联合路一带），
+公开接口最细粒度为"逐 3 小时"（每天 8 个时次）。
 
 可选对照：Open-Meteo（ECMWF/ICON 国际模型，逐 2 小时步长）——
 默认开启并在文档中用"附注"独立呈现，标注非官方；可在下方开关关闭。
@@ -10,6 +11,9 @@
 输出：
 - 大连天气-2小时预报.md   每次运行整体覆盖（主表为中央气象台逐3小时）
 - 大连天气-同步日志.md     追加每次运行记录（时间/状态/24h 摘要）
+
+触发方式：.github/workflows/weather-sync.yml 的 schedule 每小时执行一次，
+由 GitHub Actions 提交回仓库；本机不依赖 launchd/crontab。
 """
 
 import json
@@ -26,8 +30,9 @@ BASE_DIR = Path(__file__).resolve().parent
 OUT_MD = BASE_DIR / "大连天气-2小时预报.md"
 LOG_MD = BASE_DIR / "大连天气-同步日志.md"
 
-# 中国天气网（中央气象台）大连城市代码
-CMA_CITY_ID = "101070201"
+# 中国天气网（中央气象台）大连·沙河口区代码（酒店所在区，101070210）
+CMA_CITY_ID = "101070210"
+CITY_NAME = "大连·沙河口区（西安路/联合路酒店）"
 # 是否附带国际模型（Open-Meteo）对照：True=附注显示差异；False=只保留中央气象台
 INCLUDE_COMPARISON = True
 
@@ -36,14 +41,13 @@ UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 )
-# 本机外网流量需走本地代理（curl 自动使用；launchd 环境无代理变量，需显式指定）
-PROXY_URL = (
-    os.environ.get("HTTP_PROXY")
-    or os.environ.get("http_proxy")
-    or "http://127.0.0.1:7897"
-)
-_OPENER = build_opener(
-    ProxyHandler({"http": PROXY_URL, "https": PROXY_URL})
+# 代理仅当环境变量显式设置时启用（本机可经 HTTP_PROXY 走本地代理；
+# GitHub Actions 无此变量，直连官方接口）
+_PROXY = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")
+_OPENER = (
+    build_opener(ProxyHandler({"http": _PROXY, "https": _PROXY}))
+    if _PROXY
+    else build_opener()
 )
 
 TRIP_DAYS = {
@@ -168,12 +172,16 @@ def build_md(
     now: datetime,
 ) -> str:
     lines = []
-    lines.append("# 大连天气预报（同步）· 中国天气网 / 中央气象台")
+    lines.append("# 大连（沙河口区）天气预报 · 中国天气网 / 中央气象台")
     lines.append("")
-    lines.append(f"- 更新时间：{now:%Y-%m-%d %H:%M}（每小时自动同步）")
+    lines.append(
+        f"- 更新时间：{now:%Y-%m-%d %H:%M}"
+        "（GitHub Actions 每小时自动同步）"
+    )
     lines.append(
         "- 数据来源：中国天气网 weather.com.cn"
-        "（中央气象台 / 中国气象局官方公众服务），大连代码 101070201"
+        "（中央气象台 / 中国气象局官方公众服务），"
+        f"大连·沙河口区代码 {CMA_CITY_ID}（对应酒店：西安路/联合路一带）"
     )
     lines.append(
         "- 粒度说明：官方公开接口最细为**逐 3 小时**"
