@@ -214,6 +214,26 @@ a:hover { text-decoration: underline; }
 .pay-summary .warn { color: var(--tint-red); }
 .pay-summary .ok-text { color: var(--tint-green); }
 
+/* ── 天气逐3小时表（总览直接渲染） ── */
+.wx-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 8px; border-radius: var(--radius-md); }
+.wx-table { border-collapse: separate; border-spacing: 0; min-width: 740px; width: 100%; background: var(--bg-elevated); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); font-size: 12px; }
+.wx-table th, .wx-table td { padding: 7px 5px; text-align: center; border-bottom: .5px solid var(--separator); vertical-align: middle; }
+.wx-table thead th { background: var(--bg-grouped); font-size: 11px; font-weight: 600; color: var(--text-secondary); position: sticky; top: 0; z-index: 1; }
+.wx-table thead th:first-child, .wx-table td.wx-day { text-align: left; }
+.wx-table td.wx-day { font-weight: 600; white-space: nowrap; padding-left: 12px; font-size: 12px; }
+.wx-table td.wx-day small { display: block; font-weight: 400; color: var(--text-tertiary); font-size: 10.5px; }
+.wx-table td.wx-cell { font-size: 11px; line-height: 1.2; white-space: nowrap; min-width: 52px; }
+.wx-cell .wxe { display: block; font-size: 14px; line-height: 1.35; }
+.wx-cell .wxt { font-size: 11.5px; font-weight: 600; }
+.wx-cell.wx-empty { color: var(--text-tertiary); }
+.wx-table tr.wx-today td { background: rgba(0,122,255,.055); }
+.wx-table tr.wx-today td.wx-day { color: var(--accent); }
+.wx-table td.wx-side { text-align: left; min-width: 150px; font-size: 10.5px; line-height: 1.5; color: var(--text-secondary); white-space: normal; padding: 6px 10px; }
+.wx-side .sun { white-space: nowrap; font-weight: 600; color: var(--text-primary); font-size: 11px; }
+.wx-side .tide-ok { color: var(--tint-green); font-weight: 700; }
+.wx-meta { font-size: 12px; color: var(--text-tertiary); margin: 2px 0 8px; line-height: 1.6; }
+.wx-meta a { color: var(--accent); }
+
 /* ── Legend ── */
 .legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 8px 0; font-size: 12px; color: var(--text-secondary); }
 .legend-item { display: flex; align-items: center; gap: 5px; }
@@ -344,6 +364,102 @@ window.addEventListener('load', () => requestAnimationFrame(() => window.scrollT
 // ║  REPLACE THIS SECTION — Overview tab content                ║
 // ╚══════════════════════════════════════════════════════════════╝
 
+/* ══════════ 天气逐3小时表（总览直接渲染） ══════════ */
+const WX_HOURS = ['02:00','05:00','08:00','11:00','14:00','17:00','20:00','23:00'];
+
+/* 日出日落 / 潮汐（老虎滩潮汐表，8月中数据） */
+const WX_EXTRA = {
+  '2026-08-14': { sun:'🌅05:06 · 🌇18:52', tide:'干潮05:00(0.3m) · 满潮11:00(3.6m) · 干潮17:00(0.6m)', note:'' },
+  '2026-08-15': { sun:'🌅05:05 · 🌇18:53', tide:'干潮05:00(0.3m) · 满潮12:00(3.5m) · 干潮18:00(0.5m)', note:'' },
+  '2026-08-16': { sun:'🌅05:05 · 🌇18:53', tide:'干潮06:00(0.4m) · 满潮12:00(3.4m) · 干潮18:00(0.5m)', note:'' },
+  '2026-08-17': { sun:'🌅05:05 · 🌇18:53', tide:'干潮07:00(0.6m) · 满潮13:00(3.2m) · 干潮19:00(0.5m)', note:'赶海窗口16:00–18:30' },
+  '2026-08-18': { sun:'🌅05:05 · 🌇18:53', tide:'干潮07:00(0.8m) · 满潮13:00(3.0m) · 干潮20:00(0.6m)', note:'' },
+  '2026-08-19': { sun:'🌅05:06 · 🌇18:52', tide:'干潮08:00(1.0m) · 满潮14:00(2.8m) · 干潮20:00(0.7m)', note:'' }
+};
+
+/* 静态兜底数据（与最新 md 一致；页面打开时会用 md 动态覆盖） */
+const WX_STATIC = [
+  { date:'2026-08-14', day:'D0 抵达夜', hours:{ '11:00':'多云|29','14:00':'多云|29','17:00':'多云|28','20:00':'多云|27','23:00':'晴|27' } },
+  { date:'2026-08-15', day:'D1 南海岸', hours:{ '02:00':'晴|27','05:00':'晴|25','08:00':'晴|27','11:00':'多云|28','14:00':'多云|29','17:00':'多云|29','20:00':'多云|26','23:00':'晴|25' } },
+  { date:'2026-08-16', day:'D2 海钓日', hours:{ '02:00':'晴|24','05:00':'晴|24','08:00':'晴|27','11:00':'多云|29','14:00':'多云|29','17:00':'多云|28','20:00':'多云|26','23:00':'晴|25' } },
+  { date:'2026-08-17', day:'D3 东海岸赶海', hours:{ '02:00':'晴|24','05:00':'晴|24','08:00':'晴|26','11:00':'晴|30','14:00':'晴|31','17:00':'晴|31','20:00':'晴|26','23:00':'晴|26' } },
+  { date:'2026-08-18', day:'D4 东港+索道', hours:{ '02:00':'晴|25','05:00':'晴|25','08:00':'晴|29','11:00':'多云|29','14:00':'多云|30','17:00':'多云|30','20:00':'多云|26','23:00':'多云|26' } },
+  { date:'2026-08-19', day:'D5 返程', hours:{ '02:00':'多云|26','05:00':'多云|27','08:00':'多云|28','11:00':'多云|31','14:00':'多云|31','17:00':'多云|29','20:00':'多云|29','23:00':'阴|28' } }
+];
+
+function wxEmoji(w) {
+  w = String(w || '');
+  if (w.indexOf('雷') > -1) return '⛈️';
+  if (w.indexOf('雨') > -1) return '🌧️';
+  if (w.indexOf('雪') > -1) return '❄️';
+  if (w.indexOf('雾') > -1) return '🌫️';
+  if (w.indexOf('晴') > -1) return '☀️';
+  if (w.indexOf('阴') > -1) return '☁️';
+  if (w.indexOf('云') > -1) return '⛅';
+  return '🌡️';
+}
+
+function localTodayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function buildWeatherHtml(rows) {
+  const today = localTodayStr();
+  let h = '<table class="wx-table" id="wxTable"><thead><tr><th>日期</th>';
+  for (let i = 0; i < WX_HOURS.length; i++) h += '<th>' + WX_HOURS[i] + '</th>';
+  h += '<th>日出日落 · 潮汐</th></tr></thead><tbody>';
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const ex = WX_EXTRA[row.date] || { sun:'', tide:'', note:'' };
+    h += '<tr class="wx-row' + (row.date === today ? ' wx-today' : '') + '">';
+    h += '<td class="wx-day">' + row.day + '<small>' + row.date.slice(5).replace('-','/') + '</small></td>';
+    for (let i = 0; i < WX_HOURS.length; i++) {
+      const cell = row.hours[WX_HOURS[i]];
+      if (!cell) { h += '<td class="wx-cell wx-empty">—</td>'; continue; }
+      const parts = cell.split('|');
+      h += '<td class="wx-cell"><span class="wxe">' + wxEmoji(parts[0]) + '</span><span class="wxt">' + parts[1] + '°</span></td>';
+    }
+    h += '<td class="wx-side"><div class="sun">' + ex.sun + '</div><div>' + ex.tide + '</div>';
+    if (ex.note) h += '<div class="tide-ok">⚠️ ' + ex.note + '</div>';
+    h += '</td></tr>';
+  }
+  h += '</tbody></table>';
+  return h;
+}
+
+/* 解析「大连天气-2小时预报.md」的逐3小时段落 */
+function parseWeatherMd(txt) {
+  const rows = [];
+  const segRe = /^###\s+(\d{4}-\d{2}-\d{2})(?:\s*·\s*(.+?))?\s*$/gm;
+  let m;
+  while ((m = segRe.exec(txt)) !== null) {
+    const date = m[1];
+    if (date < '2026-08-14' || date > '2026-08-19') continue;
+    const segEnd = txt.indexOf('\n### ', segRe.lastIndex);
+    const seg = segEnd === -1 ? txt.slice(segRe.lastIndex) : txt.slice(segRe.lastIndex, segEnd);
+    const hours = {};
+    const rowRe = /^\|\s*(\d{2}:\d{2})\s*\|\s*([^|]+?)\s*\|\s*([\d.]+)℃/gm;
+    let r;
+    while ((r = rowRe.exec(seg)) !== null) hours[r[1]] = r[2].trim() + '|' + r[3];
+    if (Object.keys(hours).length) rows.push({ date: date, day: (m[2]||'').trim() || date.slice(5), hours: hours });
+  }
+  return rows;
+}
+
+/* 每次切到总览时从 md 拉最新数据；失败（如 file://）保留静态表 */
+function loadWeatherTable() {
+  const wrap = document.getElementById('weatherWrap');
+  if (!wrap) return;
+  fetch('大连天气-2小时预报.md', { cache: 'no-store' })
+    .then(function (res) { if (!res.ok) throw new Error('http ' + res.status); return res.text(); })
+    .then(function (txt) {
+      const rows = parseWeatherMd(txt);
+      if (rows && rows.length) wrap.innerHTML = buildWeatherHtml(rows);
+    })
+    .catch(function () { /* 保留静态表格 */ });
+}
+
 function overviewContent() {
   return `
 <div class="hero"><h1>大连 5 日行程地图</h1><p class="subtitle">2026.8.14 抵 · 8.19 返 · 南海岸 → 海钓 → 东海岸赶海 → 市区 → 返程</p></div>
@@ -360,6 +476,9 @@ function overviewContent() {
   <div class="ok-text">→ 8/17 转晴：东海岸+石槽子赶海主窗口（干潮19:00，16:00–18:30下滩，18:30前上岸）。</div>
   <div>→ 8/18 干潮20:00，黑石礁/付家庄为赶海补位；详细版文档见 <a href="大连行程规划-详细版.md" target="_blank">大连行程规划-详细版.md</a>，天气逐3小时表见 <a href="大连天气-2小时预报.md" target="_blank">大连天气-2小时预报.md</a>。</div>
 </div>
+<div class="section-head">🌤️ 天气 · 逐3小时（行=每天 · 列=时刻）</div>
+<div class="wx-meta">数据源：中国天气网/中央气象台（每小时自动同步）。天气以 emoji+温度表示，右侧附当日日出日落与潮汐（老虎滩）。<a href="大连天气-2小时预报.md" target="_blank">查看原始数据文件</a></div>
+<div class="wx-wrap" id="weatherWrap">${buildWeatherHtml(WX_STATIC)}</div>
 <div class="section-head">行程概览</div>
 <div class="day-list">${DAYS.slice(1).map(d=>`<div class="card" onclick="go(${d.id})"><div class="name"><span class="dot" style="background:${d.color}"></span>${d.label} · ${d.title}</div><div class="desc">${d.date}</div></div>`).join('')}</div>
 <div class="section-head">支付提醒</div>
@@ -633,6 +752,7 @@ function go(idx) {
   cur = idx;
   tabsEl.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', +t.dataset.day===idx));
   contentEl.innerHTML = idx===0 ? overviewContent() : renderDay(idx);
+  if (idx===0) loadWeatherTable();
   showDay(idx);
   contentEl.scrollTo({top:0});
   const tab = tabsEl.querySelector(`[data-day="${idx}"]`);
