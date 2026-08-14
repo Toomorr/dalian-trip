@@ -532,6 +532,19 @@ function loadActionRun() {
     })
     .catch(function () { /* 保留上次值 */ });
 }
+function loadWxCommit() {
+  const el = document.getElementById('wxCommitTime');
+  if (!el) return;
+  fetch('https://api.github.com/repos/Toomorr/dalian-trip/commits?path=' + encodeURIComponent('大连天气-2小时预报.md') + '&per_page=1', { cache: 'no-store' })
+    .then(function (r) { if (!r.ok) throw new Error('api ' + r.status); return r.json(); })
+    .then(function (d) {
+      const c = Array.isArray(d) && d[0];
+      if (c && c.commit && c.commit.committer && c.commit.committer.date) {
+        el.textContent = wxLocalTime(c.commit.committer.date);
+      }
+    })
+    .catch(function () { /* 保留上次值 */ });
+}
 function tickWxClock() {
   const el = document.getElementById('wxPageClock');
   if (el) {
@@ -546,7 +559,8 @@ function startWxLive() {
   tickWxClock();
   setInterval(tickWxClock, 1000);          // 本页刷新时钟：每秒
   setInterval(loadWeatherTable, 60000);    // 天气数据：每 60 秒拉取
-  setInterval(loadActionRun, 120000);      // Actions 最近运行：每 2 分钟（避开 API 限额）
+  setInterval(loadWxCommit, 120000);       // 数据最新提交：每 2 分钟（GitHub API）
+  setInterval(loadActionRun, 180000);      // Actions 最近运行：每 3 分钟（合计 API 调用 50 次/时，限额内）
 }
 startWxLive();
 
@@ -579,7 +593,7 @@ function overviewContent() {
   <div class="ok-text">🟢 富斯特索道（D4 13:45）白天基本不排队；付家庄/银沙滩（D1上午）周末人多，早到并14:00前离开。</div>
 </div>
 <div class="section-head">🌤️ 天气 · 逐3小时 · 沙河口区（行=每天 · 列=时刻）</div>
-<div class="wx-meta">数据源：中国天气网/中央气象台 · 大连沙河口区（101070210）· 更新时间 <span id="wxUpdateTime2">${WX_UPDATE_FALLBACK}</span> ｜ 页面每 60 秒拉取（raw 直连）｜ GitHub Actions 每分钟心跳 · 最近运行 <span id="wxActionRun">…</span> ｜ 本页刷新 <span id="wxPageClock">—</span><br>夜晚时段（日出前/日落后）：晴=🌙、多云=🌙☁️、阴=☁️；白天晴=☀️、多云=⛅、阴=☁️。右侧附日出日落与潮汐（老虎滩）。<a href="大连天气-2小时预报.md" target="_blank">查看原始数据文件</a></div>
+<div class="wx-meta">数据源：中国天气网/中央气象台 · 大连沙河口区（101070210）· 更新时间 <span id="wxUpdateTime2">${WX_UPDATE_FALLBACK}</span>（raw 缓存可能滞后数分钟）｜ 数据最新提交 <span id="wxCommitTime">…</span>（GitHub API 实时）｜ 页面每 60 秒拉取 ｜ 心跳每 60 秒同步 · 最近运行 <span id="wxActionRun">…</span> ｜ 本页刷新 <span id="wxPageClock">—</span><br>夜晚时段（日出前/日落后）：晴=🌙、多云=🌙☁️、阴=☁️；白天晴=☀️、多云=⛅、阴=☁️。右侧附日出日落与潮汐（老虎滩）。<a href="大连天气-2小时预报.md" target="_blank">查看原始数据文件</a></div>
 <div class="wx-wrap" id="weatherWrap">${buildWeatherHtml(WX_STATIC)}</div>
 <div class="section-head">行程概览</div>
 <div class="day-list">${DAYS.slice(1).map(d=>`<div class="card" onclick="go(${d.id})"><div class="name"><span class="dot" style="background:${d.color}"></span>${d.label} · ${d.title}</div><div class="desc">${d.date}</div></div>`).join('')}</div>
@@ -814,6 +828,7 @@ function go(idx) {
   contentEl.innerHTML = idx===0 ? overviewContent() : renderDay(idx);
   if (idx===0) loadWeatherTable();
   if (idx===0) setTimeout(loadActionRun, 200); // 打开总览立即显示 Actions 最近运行
+  if (idx===0) setTimeout(loadWxCommit, 400);  // 立即显示数据最新提交
   showDay(idx);
   contentEl.scrollTo({top:0});
   const tab = tabsEl.querySelector(`[data-day="${idx}"]`);
