@@ -12,7 +12,7 @@
 - 大连天气-2小时预报.md   每次运行整体覆盖（主表为中央气象台逐3小时）
 - 大连天气-同步日志.md     追加每次运行记录（时间/状态/24h 摘要）
 
-触发方式：.github/workflows/weather-sync.yml 的 schedule 每小时执行一次，
+触发方式：.github/workflows/weather-sync.yml 的 schedule 每 5 分钟执行一次，
 由 GitHub Actions 提交回仓库；本机不依赖 launchd/crontab。
 """
 
@@ -176,7 +176,7 @@ def build_md(
     lines.append("")
     lines.append(
         f"- 更新时间：{now:%Y-%m-%d %H:%M}"
-        "（GitHub Actions 每小时自动同步）"
+        "（GitHub Actions 每 5 分钟自动同步）"
     )
     lines.append(
         "- 数据来源：中国天气网 weather.com.cn"
