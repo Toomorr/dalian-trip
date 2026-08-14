@@ -1,0 +1,44 @@
+name: 天气心跳（每分钟）
+
+on:
+  schedule:
+    # 每小时重启一次心跳（避免超过单任务 6 小时上限）
+    - cron: '0 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weather-heartbeat
+  cancel-in-progress: false
+
+env:
+  TZ: Asia/Shanghai
+
+jobs:
+  beat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 58
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 每分钟同步并推送（持续约 55 分钟）
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for i in $(seq 1 55); do
+            python3 sync_weather.py || true
+            git add "大连天气-2小时预报.md" "大连天气-同步日志.md"
+            if ! git diff --cached --quiet; then
+              git commit -m "chore: 天气心跳 $(date -u +'%Y-%m-%d %H:%M UTC')" || true
+              git push -q || { git pull --rebase -X theirs -q || true; git push -q || true; }
+            fi
+            sleep 60
+          done
