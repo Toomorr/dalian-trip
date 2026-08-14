@@ -167,6 +167,10 @@ a:hover { text-decoration: underline; }
 .btn.xhs    { background: #ff2442; color: #fff; }
 .btn.dp     { background: #ffa700; color: #fff; }
 .btn.rsv    { background: var(--tint-green); color: #fff; }
+/* 手机端 App 直跳按钮（描边白底，与网页按钮区分） */
+.btn.xhs.app, .btn.dp.app { background: #fff; }
+.btn.xhs.app { color: #ff2442; box-shadow: inset 0 0 0 1.5px rgba(255,36,66,.4); }
+.btn.dp.app { color: #e08a00; box-shadow: inset 0 0 0 1.5px rgba(255,167,0,.55); }
 
 /* Action Sheet */
 .as-overlay {
@@ -603,7 +607,7 @@ function showDay(idx) {
     if(!l.lat) return;
     const m = L.marker([l.lat,l.lng], { icon: icon(day.color, emojis[l.type]||'📌') }).addTo(map);
     const gmapQ = l.gmap||encodeURIComponent(l.name+' Tokyo');
-    m.bindPopup(`<b>${l.name}</b>${l.time!=='—'?'<br><span style="color:#86868b">'+l.time+'</span>':''}<br>${l.desc}${l.budget?'<br><span style="color:#ff9500">'+l.budget+'</span>':''}<br><a href="#" onclick="event.preventDefault();openAS('${l.name.replace(/'/g,"\\'")}',${l.lat},${l.lng},'${gmapQ}')">📍 导航</a>${(l.xhs||l.xhsKeyword)?' · <a href="'+xhsWebUrl(l)+'" data-xhs-keyword="'+xhsKeyword(l)+'" target="_blank">📕 小红书</a>':''}`);
+    m.bindPopup(`<b>${l.name}</b>${l.time!=='—'?'<br><span style="color:#86868b">'+l.time+'</span>':''}<br>${l.desc}${l.budget?'<br><span style="color:#ff9500">'+l.budget+'</span>':''}<br><a href="#" onclick="event.preventDefault();openAS('${l.name.replace(/'/g,"\\'")}',${l.lat},${l.lng},'${gmapQ}')">📍 导航</a><br><a href="${xhsWebHref(l)}" target="_blank" rel="noopener">📕 小红书搜索</a>`);
     markers.push(m);
     if(l.time!=='—') coords.push([l.lat,l.lng]);
   });
@@ -637,91 +641,46 @@ function xhsKeyword(loc) {
   if(loc.xhsKeyword) return loc.xhsKeyword.trim();
   return (loc.name||'').replace(/⭐.*$/g,'').replace(/（.*?）/g,'').replace(/\(.*?\)/g,'').replace(/\s+/g,' ').trim();
 }
-function xhsAppUrl(loc) { return `xhsdiscover://search/result?keyword=${encodeURIComponent(xhsKeyword(loc))}&target_search=notes&source=deeplink`; }
-function xhsWebUrl(loc) { return `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(xhsKeyword(loc))}&source=web_explore_feed`; }
 
 function dpKeyword(loc) {
   if(loc.dianpingKeyword) return loc.dianpingKeyword.trim();
   return (loc.name||'').replace(/⭐.*$/g,'').replace(/（.*?）/g,'').replace(/\(.*?\)/g,'').replace(/\s+/g,' ').trim();
 }
-function dpAppUrl(loc) { return `dianping://searchshoplist?keyword=${encodeURIComponent(dpKeyword(loc))}`; }
-function dpWebUrl(loc) { return `https://m.dianping.com/searchshop?keyword=${encodeURIComponent(dpKeyword(loc))}`; }
 
-window._extLocs = {};
-DAYS.forEach(d => d.locations.forEach(l => { window._extLocs[`${d.id}::${l.name}`] = l; }));
-window._xhsLocs = window._extLocs;
+const DP_CITY_ID = 19; // 大众点评·大连 cityId
+function xhsWebHref(loc) { return `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(xhsKeyword(loc))}&source=web_explore_feed`; }
+function xhsAppHref(loc) { return `xhsdiscover://search/result?keyword=${encodeURIComponent(xhsKeyword(loc))}&target_search=notes&source=deeplink`; }
+function dpWebHref(loc) { return `https://www.dianping.com/search/keyword/${DP_CITY_ID}/0_${encodeURIComponent(dpKeyword(loc))}`; }
+function dpAppHref(loc) { return `dianping://searchshoplist?keyword=${encodeURIComponent(dpKeyword(loc))}`; }
 
-function openExt(key, kind) {
-  const loc = window._extLocs[key]; if(!loc) return false;
-  if (IN_APP_WEBVIEW) {
-    window.location.href = kind==='dp' ? dpWebUrl(loc) : xhsWebUrl(loc);
+/* ── 统一四入口：小红书/大众点评 × 网页搜索 + 手机 App 直跳 ──
+   网页按钮 = 普通新窗口链接；手机按钮 = 原生 scheme 直跳（用户点击触发，不做 iframe 猜测） */
+function extButtons(loc) {
+  const hasDp = loc.dianping !== false;
+  let h = '';
+  if (IS_MOBILE) {
+    h += `<a href="${xhsWebHref(loc)}" target="_blank" rel="noopener" class="btn xhs">📕 小红书搜索</a>`;
+    h += `<a href="${xhsAppHref(loc)}" class="btn xhs app" title="在 App 内搜索「${xhsKeyword(loc)}」">📕 小红书搜索（手机）</a>`;
+    if (hasDp) {
+      h += `<a href="${dpWebHref(loc)}" target="_blank" rel="noopener" class="btn dp">🍜 大众点评搜索</a>`;
+      h += `<a href="${dpAppHref(loc)}" class="btn dp app" title="在 App 内搜索「${dpKeyword(loc)}」">🍜 大众点评搜索（手机）</a>`;
+    }
   } else {
-    window.location.href = kind==='dp' ? dpAppUrl(loc) : xhsAppUrl(loc);
+    h += `<a href="${xhsWebHref(loc)}" target="_blank" rel="noopener" class="btn xhs">📕 小红书搜索</a>`;
+    if (hasDp) h += `<a href="${dpWebHref(loc)}" target="_blank" rel="noopener" class="btn dp">🍜 大众点评搜索</a>`;
   }
-  return false;
+  return h;
 }
-function openXhs(key) { return openExt(key, 'xhs'); }
-function openDp(key)  { return openExt(key, 'dp'); }
-
-/* ── 手机端智能打开：先尝试 App 跳转（隐藏 iframe，避免 Safari 报错），
-   未安装/被拦截时 1.5 秒后自动回退到网页搜索页 ── */
-function openXhsSmart(keyword) {
-  const app = 'xhsdiscover://search/result?keyword=' + encodeURIComponent(keyword) + '&target_search=notes&source=deeplink';
-  const web = 'https://www.xiaohongshu.com/search_result?keyword=' + encodeURIComponent(keyword) + '&source=web_explore_feed';
-  let settled = false;
-  const settle = (url) => { if (!settled) { settled = true; window.location.href = url; } };
-  const timer = setTimeout(() => settle(web), 1500);
-  const onLeave = () => { clearTimeout(timer); settled = true; };
-  document.addEventListener('visibilitychange', onLeave, { once: true });
-  window.addEventListener('pagehide', onLeave, { once: true });
-  const iframe = document.createElement('iframe');
-  iframe.style.display = 'none';
-  iframe.src = app;
-  document.body.appendChild(iframe);
-  setTimeout(() => iframe.remove(), 3000);
-}
-function openDpSmart(keyword) {
-  const app = 'dianping://searchshoplist?keyword=' + encodeURIComponent(keyword);
-  const web = 'https://m.dianping.com/searchshop?keyword=' + encodeURIComponent(keyword);
-  let settled = false;
-  const settle = (url) => { if (!settled) { settled = true; window.location.href = url; } };
-  const timer = setTimeout(() => settle(web), 1500);
-  const onLeave = () => { clearTimeout(timer); settled = true; };
-  document.addEventListener('visibilitychange', onLeave, { once: true });
-  window.addEventListener('pagehide', onLeave, { once: true });
-  const iframe = document.createElement('iframe');
-  iframe.style.display = 'none';
-  iframe.src = app;
-  document.body.appendChild(iframe);
-  setTimeout(() => iframe.remove(), 3000);
-}
-document.addEventListener('click', function (e) {
-  const xa = e.target.closest('a[data-xhs-keyword]');
-  if (xa && IS_MOBILE) { e.preventDefault(); openXhsSmart(xa.getAttribute('data-xhs-keyword')); return; }
-  const da = e.target.closest('a[data-dp-keyword]');
-  if (da && IS_MOBILE) { e.preventDefault(); openDpSmart(da.getAttribute('data-dp-keyword')); return; }
-});
 
 function locCard(loc, dayIdx) {
   const dot = loc.type==='food'?'food':loc.type==='spot'?'spot':loc.type==='drink'?'drink':loc.type==='hotel'?'hotel':'transport';
   const bdg = loc.type==='food'?'<span class="badge food">餐</span>':loc.type==='spot'?'<span class="badge spot">景</span>':loc.type==='drink'?'<span class="badge drink">饮</span>':'';
   const uid = `d${dayIdx}-${loc.name.replace(/\W/g,'')}`;
-  const locKey = `${dayIdx}::${loc.name}`;
   const gmapQ = loc.gmap||encodeURIComponent(loc.name+' Tokyo');
   let lnk = `<button class="btn nav" onclick="openAS('${loc.name.replace(/'/g,"\\'")}',${loc.lat},${loc.lng},'${gmapQ}')">📍 导航</button>`;
-  const xhsLabel = IS_MOBILE ? '📕 小红书（手机打开）' : '📕 小红书搜索';
-  if(loc.xhs||loc.xhsKeyword) {
-    lnk += `<a href="${xhsWebUrl(loc)}" data-xhs-keyword="${xhsKeyword(loc)}" target="_blank" class="btn xhs">${xhsLabel}</a>`;
-  }
-  const dpEnabled = loc.dianping !== false &&
-    (loc.dianping || loc.dianpingKeyword || loc.type==='food' || loc.type==='drink');
-  const dpLabel = IS_MOBILE ? '🍜 大众点评（手机打开）' : '🍜 大众点评';
-  if(dpEnabled) {
-    lnk += `<a href="${dpWebUrl(loc)}" data-dp-keyword="${dpKeyword(loc)}" target="_blank" class="btn dp">${dpLabel}</a>`;
-  }
+  lnk += extButtons(loc);
   if(loc.reserve) lnk += `<a href="${loc.reserve}" target="_blank" class="btn rsv">📅 预约</a>`;
-  let detailHtml = (loc.detail||'').replace(/\n/g,'<br>')
-    .replace(/href="https:\/\/www\.xiaohongshu\.com\/discovery\/item\/[^"]+"/g, 'href="'+xhsWebUrl(loc)+'" data-xhs-keyword="'+xhsKeyword(loc)+'"');
+  let detailHtml = (loc.detail||'').replace(/\n/g,'<br>');
   return `<div class="tl-item"><div class="tl-dot ${dot}"></div><div class="card" onclick="if(!event.target.closest('.btn,.links'))toggle('${uid}')"><div class="time">${loc.time!=='—'?loc.time:'备选'}</div><div class="name">${bdg} ${loc.name}</div><div class="desc">${loc.desc}</div>${loc.budget?'<div class="budget">'+loc.budget+'</div>':''}${payChips(loc.pay)}<div class="links">${lnk}</div>${loc.detail?'<div class="details" id="'+uid+'">'+detailHtml+'</div>':''}</div></div>`;
 }
 
