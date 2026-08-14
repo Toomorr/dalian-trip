@@ -2,8 +2,8 @@ name: 天气同步（大连·沙河口区）
 
 on:
   schedule:
-    # 每小时第 0 分执行（UTC 16:00 对应北京时间 00:00）
-    - cron: '0 * * * *'
+    # GitHub Actions 定时最小粒度为 5 分钟；每 5 分钟同步一次（UTC 与北京时间同频）
+    - cron: '*/5 * * * *'
   workflow_dispatch: {}
 
 permissions:

@@ -8,9 +8,9 @@
 |---|---|
 | `index.html` | 交互地图页（Leaflet 本地化，顶部地图占 80% 视口、随滚动缩至 40% 并锁定；桌面/手机双端自适应；每个行程点附小红书搜索外链，手机端为 App 跳转+网页兜底） |
 | `大连行程规划-详细版.md` | 五日规划：每日行程、晴天/雨天预案、景点证据库（小红书好评/差评+链接）、餐厅总览填空表、赶海攻略 |
-| `大连天气-2小时预报.md` | 中央气象台逐 3 小时预报（沙河口区 101070210，每小时由 GitHub Actions 自动刷新，每日 8 个时次） |
-| `sync_weather.py` | 天气同步脚本（由 `.github/workflows/weather-sync.yml` 每小时在 GitHub Actions 执行并提交回仓库） |
-| `.github/workflows/weather-sync.yml` | GitHub Actions 定时任务：每小时同步沙河口区天气并推送（可手动触发） |
+| `大连天气-2小时预报.md` | 中央气象台逐 3 小时预报（沙河口区 101070210，每 5 分钟由 GitHub Actions 自动刷新，每日 8 个时次） |
+| `sync_weather.py` | 天气同步脚本（由 `.github/workflows/weather-sync.yml` 每 5 分钟在 GitHub Actions 执行并提交回仓库） |
+| `.github/workflows/weather-sync.yml` | GitHub Actions 定时任务：每 5 分钟同步沙河口区天气并推送（可手动触发） |
 | `xhs_research.py` | 小红书调研脚本（本地 Firefox+真实鼠标+屏幕 OCR）：体验项目模式 / 景点餐厅模式（`--targets`），支持断点续跑（`--resume`） |
 | `research_targets.json` | 景点/餐厅检索目标清单（18 个行程点） |
 | `ocr_screen.swift` / `window_list.swift` | macOS Vision OCR 与窗口定位（点击坐标校准用） |
@@ -24,9 +24,11 @@
 
 ## 天气更新流程（GitHub Actions）
 
-1. 仓库内 `.github/workflows/weather-sync.yml` 每小时自动运行 `sync_weather.py`，刷新 `大连天气-2小时预报.md` 与 `大连天气-同步日志.md` 并提交推送；
-2. 也可在 GitHub 仓库 Actions 页面手动触发 `workflow_dispatch`；
-3. 页面总览会显示最新更新时间；如需本地手动刷一次，可执行：
+1. 仓库内 `.github/workflows/weather-sync.yml` 每 5 分钟自动运行 `sync_weather.py`，刷新 `大连天气-2小时预报.md` 与 `大连天气-同步日志.md` 并提交推送（GitHub Actions 定时最小粒度为 5 分钟）；
+2. 网页总览每 60 秒自动拉取天气 md，并每 2 分钟显示 Actions 最近运行时间（公开 API）；
+3. 注意：GitHub Pages 每小时最多构建 10 次，推送过密时线上文件更新会有几分钟滞后，但仓库内 md 与 Actions 运行状态实时可见；
+4. 也可在 GitHub 仓库 Actions 页面手动触发 `workflow_dispatch`；
+5. 页面总览会显示最新更新时间；如需本地手动刷一次，可执行：
 
 ```bash
 python3 sync_weather.py
