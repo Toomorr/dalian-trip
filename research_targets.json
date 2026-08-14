@@ -1,0 +1,22 @@
+{
+  "targets": [
+    { "name": "莲花山观景台/海达索道", "keyword": "莲花山观景台 索道", "dpKeyword": "莲花山观景台", "type": "景点" },
+    { "name": "星海广场音乐喷泉", "keyword": "星海广场 音乐喷泉", "dpKeyword": "星海广场", "type": "景点" },
+    { "name": "付家庄海滨浴场", "keyword": "付家庄 海滨浴场", "dpKeyword": "付家庄海滨浴场", "type": "海滩" },
+    { "name": "银沙滩公园", "keyword": "银沙滩 大连", "dpKeyword": "银沙滩公园", "type": "海滩" },
+    { "name": "小岗/亲海栈道", "keyword": "小岗 亲海栈道 大连", "dpKeyword": "亲海栈道", "type": "海滩" },
+    { "name": "星海湾跨海大桥（东岸）", "keyword": "星海湾跨海大桥 打卡", "dpKeyword": "星海湾跨海大桥", "type": "景点" },
+    { "name": "菱角湾", "keyword": "菱角湾 大连", "dpKeyword": "菱角湾", "type": "景点" },
+    { "name": "渔人码头", "keyword": "渔人码头 大连", "dpKeyword": "渔人码头", "type": "景点" },
+    { "name": "威尼斯水城（贡多拉）", "keyword": "威尼斯水城 贡多拉 大连", "dpKeyword": "大连海昌东方水城", "type": "景点" },
+    { "name": "劳动公园富斯特索道", "keyword": "劳动公园 索道 富斯特", "dpKeyword": "富斯特索滑道", "type": "景点" },
+    { "name": "石槽/琥珀湾赶海", "keyword": "石槽 赶海 大连", "dpKeyword": "石槽 琥珀湾", "type": "赶海" },
+    { "name": "桃源市场（海鲜）", "keyword": "桃源市场 大连 海鲜", "dpKeyword": "桃源市场", "type": "市场" },
+    { "name": "皇家隐厨（海鲜加工）", "keyword": "皇家隐厨 大连", "dpKeyword": "皇家隐厨 桃源市场", "type": "餐厅" },
+    { "name": "仟万佳水饺（星海广场店）", "keyword": "仟万佳水饺 大连", "dpKeyword": "仟万佳水饺 星海广场", "type": "餐厅" },
+    { "name": "阿水生鱼饭（长江路店）", "keyword": "阿水 生鱼饭 大连", "dpKeyword": "阿水的生鱼饭", "type": "餐厅" },
+    { "name": "小平岛海钓/渔港海鲜城", "keyword": "小平岛 海钓 渔港 大连", "dpKeyword": "小平岛渔港海鲜城", "type": "活动" },
+    { "name": "正黄旗海鲜烧烤", "keyword": "正黄旗 海鲜烧烤 大连", "dpKeyword": "正黄旗海鲜烧烤 港湾广场", "type": "餐厅" },
+    { "name": "南山路/七七街文创街区", "keyword": "南山路 七七街 大连", "dpKeyword": "南山路 文创", "type": "街区" }
+  ]
+}

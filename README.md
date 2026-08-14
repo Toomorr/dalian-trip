@@ -11,6 +11,9 @@
 | `大连天气-2小时预报.md` | 中央气象台逐 3 小时预报（沙河口区 101070210，每小时由 GitHub Actions 自动刷新，每日 8 个时次） |
 | `sync_weather.py` | 天气同步脚本（由 `.github/workflows/weather-sync.yml` 每小时在 GitHub Actions 执行并提交回仓库） |
 | `.github/workflows/weather-sync.yml` | GitHub Actions 定时任务：每小时同步沙河口区天气并推送（可手动触发） |
+| `xhs_research.py` | 小红书调研脚本（本地 Firefox+真实鼠标+屏幕 OCR）：体验项目模式 / 景点餐厅模式（`--targets`），支持断点续跑（`--resume`） |
+| `research_targets.json` | 景点/餐厅检索目标清单（18 个行程点） |
+| `ocr_screen.swift` / `window_list.swift` | macOS Vision OCR 与窗口定位（点击坐标校准用） |
 | `lib/` | Leaflet 1.9.4 本地库（页面离线可用） |
 | `小红书存档/` | 小红书笔记图文存档（分享短链匿名下载） |
 
@@ -30,3 +33,23 @@ python3 sync_weather.py
 ```
 
 > 数据源：中国天气网/中央气象台（weather.com.cn，大连·沙河口区 101070210，对应酒店西安路/联合路一带）；Open-Meteo 仅作对照附注。
+
+## 小红书调研（本地执行，需授权）
+
+用于检索行程景点/餐厅的小红书真实游客笔记与评论区（广告/商家推广过滤）。需要本机条件：
+
+- Firefox 已登录小红书；profile 复制到 `/tmp/xhs-ff-profile`（`xhs_research.py` docstring 有步骤）
+- `geckodriver`、`/tmp/xhs-venv`（selenium）、`cliclick`（真实鼠标）、`swift`（macOS Vision OCR）
+- macOS「辅助功能」权限给运行应用（真实点击）；「屏幕录制」权限给 `screencapture`（OCR 截图）
+
+运行：
+
+```bash
+/tmp/xhs-venv/bin/python xhs_research.py --targets          # 全量 18 个目标
+/tmp/xhs-venv/bin/python xhs_research.py --targets --resume  # 断点续跑（跳过已采集）
+/tmp/xhs-venv/bin/python xhs_research.py                      # 体验项目检索
+```
+
+输出：`小红书-景点餐厅调研.md`（工作簿）、`小红书-景点餐厅调研.json`（原始数据）、并在详细版文档追加第 10 节。
+
+> ⚠️ 风控提示：连续自动化浏览可能触发小红书风控，单轮后建议冷却 ≥1 小时再补采；遇「验证/访问过于频繁」脚本会自动停止并保留已完成部分。
