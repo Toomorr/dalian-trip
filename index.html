@@ -58,7 +58,7 @@ a:hover { text-decoration: underline; }
 
 /* ── 顶部区（地图+标签栏）：整体 sticky 锁定，地图随滚动从全屏缩到 40vh ── */
 #header { position: sticky; top: 0; z-index: 100; background: var(--bg-secondary); }
-#mapWrap { height: 100vh; overflow: hidden; background: var(--bg-secondary); }
+#mapWrap { height: 80vh; overflow: hidden; background: var(--bg-secondary); }
 #map { width: 100%; height: 100%; }
 #spacer { height: 0; }
 .locate-btn {
@@ -399,17 +399,18 @@ L.DomEvent.on(map.getContainer(), 'wheel', function (e) {
   }
 });
 
-/* ── 滚动联动：地图全屏→随滚动缩至 40vh 锁定；spacer 补偿使内容以 1 倍速、贴着地图下缘滚动 ── */
+/* ── 滚动联动：地图 80vh→随滚动缩至 40vh 锁定；spacer 补偿使内容以 1 倍速、贴着地图下缘滚动 ── */
 const mapWrap = document.getElementById('mapWrap');
 const spacer = document.getElementById('spacer');
+const MAP_START_VH = 0.80; // 初始占屏高度
 const MAP_MIN_VH = 0.40; // 缩小后锁定高度（与旧版半屏一致）
 let mapTick = false;
 function resizeMapByScroll() {
   const vh = window.innerHeight || document.documentElement.clientHeight || 0;
   const sc = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
-  const h = Math.max(vh * MAP_MIN_VH, vh - sc);
+  const h = Math.max(vh * MAP_MIN_VH, vh * MAP_START_VH - sc);
   if (mapWrap) mapWrap.style.height = Math.round(h) + 'px';
-  if (spacer) spacer.style.height = Math.max(0, Math.round(vh - h)) + 'px';
+  if (spacer) spacer.style.height = Math.min(Math.max(0, Math.round(sc)), Math.round(vh * (MAP_START_VH - MAP_MIN_VH))) + 'px';
   map.invalidateSize();
   mapTick = false;
 }
