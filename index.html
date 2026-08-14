@@ -171,6 +171,8 @@ a:hover { text-decoration: underline; }
 .btn.xhs.app, .btn.dp.app { background: #fff; }
 .btn.xhs.app { color: #ff2442; box-shadow: inset 0 0 0 1.5px rgba(255,36,66,.4); }
 .btn.dp.app { color: #e08a00; box-shadow: inset 0 0 0 1.5px rgba(255,167,0,.55); }
+/* 小红书「直达笔记」：通用链接，通常免确认直接进 App */
+.btn.xhs.note { background: #fff; color: #ff2442; box-shadow: inset 0 0 0 1.5px rgba(255,36,66,.55); }
 
 /* Action Sheet */
 .as-overlay {
@@ -505,6 +507,11 @@ function overviewContent() {
   <div class="info-card"><div class="label">天气 · 沙河口区</div><div class="value">24–31℃ 逐3小时表见总览下方<br>更新时间 <span id="wxUpdateTime">${WX_UPDATE_FALLBACK}</span>（GitHub Actions 每小时同步）</div></div>
   <div class="info-card"><div class="label">预估费用</div><div class="value">约 ¥2,500–3,500/人<br>含返程票·住宿·海钓·餐饮</div></div>
 </div>
+<div class="section-head">📱 手机打开提示（iPhone）</div>
+<div class="pay-summary">
+  <div>点「小红书搜索（手机）/大众点评搜索（手机）」时，iPhone 可能弹出系统确认框（“是否打开小红书/大众点评”）。这是 iOS 的安全机制，网页代码无法关闭；点“打开”即可，同一 App 通常只提示一次。若每次都弹：设置 → Safari → 确认“允许网站打开应用”已开启。</div>
+  <div>「📕 直达笔记」走小红书通用链接，通常无需确认直接进 App；若点「××（手机）」看到“地址无效”，说明对应 App 未安装或需更新，用旁边的网页按钮即可。</div>
+</div>
 <div class="section-head">⚠️ 台风"白海豚"与潮汐（出发前必读）</div>
 <div class="pay-summary">
   <div class="warn">白海豚（2026年第13号台风）已停编但残涡活跃：8/15 小雨、8/15夜–8/16 小到中雨、近海阵风7–8级概率大。</div>
@@ -699,10 +706,11 @@ function extButtons(loc) {
   let h = '';
   if (IS_MOBILE) {
     h += `<a href="${xhsWebHref(loc)}" target="_blank" rel="noopener" class="btn xhs">📕 小红书搜索</a>`;
-    h += `<a href="${xhsAppHref(loc)}" class="btn xhs app" title="在 App 内搜索「${xhsKeyword(loc)}」">📕 小红书搜索（手机）</a>`;
+    h += `<a href="${xhsAppHref(loc)}" class="btn xhs app" title="在 App 内搜索「${xhsKeyword(loc)}」（iOS 可能弹系统确认框，属正常）">📕 小红书搜索（手机）</a>`;
+    if (loc.xhs) h += `<a href="${loc.xhs}" target="_blank" rel="noopener" class="btn xhs note" title="直达这篇参考笔记（通用链接，通常免确认直接进 App）">📕 直达笔记</a>`;
     if (hasDp) {
       h += `<a href="${dpWebHref(loc)}" target="_blank" rel="noopener" class="btn dp">🍜 大众点评搜索</a>`;
-      h += `<a href="${dpAppHref(loc)}" class="btn dp app" title="在 App 内搜索「${dpKeyword(loc)}」">🍜 大众点评搜索（手机）</a>`;
+      h += `<a href="${dpAppHref(loc)}" class="btn dp app" title="在 App 内搜索「${dpKeyword(loc)}」（iOS 可能弹系统确认框，属正常）">🍜 大众点评搜索（手机）</a>`;
     }
   } else {
     h += `<a href="${xhsWebHref(loc)}" target="_blank" rel="noopener" class="btn xhs">📕 小红书搜索</a>`;
